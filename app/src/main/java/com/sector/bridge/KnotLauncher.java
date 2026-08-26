@@ -30,10 +30,10 @@ public class KnotLauncher {
         }
 
         if (savedPath == null || !new File(savedPath).exists()) {
-            System.out.println("Game not found. Opening Setup UI...");
+            System.out.println("SSFML: Game not found. Opening Setup UI...");
             LocVerifierApp.main(new String[0]);
         } else {
-            System.out.println("Game found at: " + savedPath);
+            System.out.println("SSFML: Game found at: " + savedPath);
             ensureFabricLibs(savedPath);
             launch(savedPath, bridgeJarPath);
         }
@@ -87,7 +87,7 @@ public class KnotLauncher {
             pb.directory(gameFolder);
             pb.inheritIO();
 
-            System.out.println("Launching Fabric with mods/ (enabled mods only): " + modsFolder.getAbsolutePath());
+            System.out.println("SSFML: Launching Fabric with mods/ (enabled mods only): " + modsFolder.getAbsolutePath());
             pb.start();
             System.exit(0);
 
@@ -122,46 +122,109 @@ public class KnotLauncher {
 
         for (String libName : requiredLibs) {
             File target = new File(libsDir, libName);
-            if (!target.exists()) {
-                System.out.println("Checking for dependency: " + libName);
 
-                try (InputStream is = KnotLauncher.class.getResourceAsStream("/" + libName)) {
-                    if (is != null) {
-                        System.out.println("Extracting " + libName + " from resources...");
-                        java.nio.file.Files.copy(is, target.toPath());
+            // If the dependency already exists and is a valid JAR, nothing needs to be done.
+            if (isValidJar(target)) {
+                continue;
+            }
+
+            // Remove any incomplete or corrupt JAR before attempting to obtain it.
+            if (target.exists()) {
+                System.out.println("SSFML: Invalid or corrupt dependency found: " + libName);
+
+                if (!target.delete()) {
+                    System.err.println("SSFML: Could not remove invalid dependency: "
+                            + target.getAbsolutePath());
+                }
+            }
+
+            System.out.println("SSFML: Checking for dependency: " + libName);
+
+            boolean obtained = false;
+
+            // First try to extract the library from the loader's own JAR.
+            try (InputStream is = KnotLauncher.class.getResourceAsStream("/" + libName)) {
+                if (is != null) {
+                    System.out.println("SSFML: Extracting " + libName + " from resources...");
+                    java.nio.file.Files.copy(is, target.toPath());
+
+                    if (isValidJar(target)) {
+                        obtained = true;
                     } else {
-                        System.out.println(libName + " not in JAR. Attempting download...");
-                    }
+                        System.err.println("SSFML: Extracted " + libName + " is invalid or corrupt.");
 
-                    // Checks primary URL then secondary URL, if both don't work print an error.
-                    List<String> urls = getUrls(libName);
-
-                    if (!target.exists()) {
-                        System.out.println(libName + " not in JAR. Attempting download...");
-                        boolean downloaded = false;
-                        for (String url : urls) {
-                            downloaded = downloadLib(url, target);
-                            if (downloaded) {
-                                break;
-                            }
-                            System.out.println("Retrying " + libName + " from a different source...");
-                        }
-                        if (downloaded) {
-                            stripSignatures(target);
-                        } else {
-                            failedLibs.add(libName + " (tried: " + String.join(", ", urls) + ")");
+                        if (!target.delete()) {
+                            System.err.println("SSFML: Could not remove invalid extracted dependency: "
+                                    + target.getAbsolutePath());
                         }
                     }
-                } catch (Exception e) {
-                    System.err.println("Error handling " + libName);
-                    e.printStackTrace();
-                    failedLibs.add(libName + " (exception: " + e.getMessage() + ")");
+                }
+            } catch (Exception e) {
+                System.err.println("SSFML: Error extracting " + libName + ": " + e.getMessage());
+
+                if (target.exists() && !target.delete()) {
+                    System.err.println("SSFML: Could not remove incomplete dependency: "
+                            + target.getAbsolutePath());
+                }
+            }
+
+            // Checks primary URL then secondary URL, if both don't work print an error.
+            if (!obtained) {
+                List<String> urls = getUrls(libName);
+
+                System.out.println("SSFML: " + libName + " not in local resources. Attempting download...");
+
+                for (String url : urls) {
+                    if (downloadLib(url, target)) {
+                        obtained = true;
+                        break;
+                    }
+
+                    System.out.println("SSFML: Retrying " + libName + " from a different source...");
+                }
+            }
+
+            if (obtained) {
+                stripSignatures(target);
+            } else {
+                List<String> urls = getUrls(libName);
+                failedLibs.add(libName + " (tried: " + String.join(", ", urls) + ")");
+
+                if (target.exists() && !target.delete()) {
+                    System.err.println("SSFML: Could not remove invalid dependency: "
+                            + target.getAbsolutePath());
                 }
             }
         }
 
         if (!failedLibs.isEmpty()) {
             writeLibErrorReport(gameFolder, failedLibs);
+        }
+    }
+
+    /**
+     * Checks whether a file is a valid JAR.
+     */
+    private static boolean isValidJar(File file) {
+        if (!file.exists() || !file.isFile() || file.length() == 0) {
+            return false;
+        }
+
+        try (java.util.jar.JarFile jar = new java.util.jar.JarFile(file)) {
+            // A valid dependency JAR should contain at least one entry.
+            if (jar.size() == 0) {
+                return false;
+            }
+
+            // Make sure the archive can actually enumerate its contents.
+            java.util.Enumeration<java.util.jar.JarEntry> entries = jar.entries();
+            if (!entries.hasMoreElements()) {
+                return false;
+            }
+
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -220,8 +283,10 @@ public class KnotLauncher {
      * Returns true on success, false on any failure.
      */
     private static boolean downloadLib(String urlString, File destination) {
+        File tempFile = new File(destination.getAbsolutePath() + ".download");
+
         try {
-            System.out.println("Downloading: " + destination.getName() + "...");
+            System.out.println("SSFML: Downloading: " + destination.getName() + "...");
             URL website = new URL(urlString);
 
             HttpURLConnection connection = (HttpURLConnection) website.openConnection();
@@ -234,17 +299,37 @@ public class KnotLauncher {
             int status = connection.getResponseCode();
             if (status != HttpURLConnection.HTTP_OK) {
                 // This stops the code from saving a 10KB error page as a JAR
-                throw new Exception("Server returned error code: " + status);
+                throw new Exception("SSFML: Server returned error code: " + status);
             }
 
             try (ReadableByteChannel rbc = Channels.newChannel(connection.getInputStream());
-                 FileOutputStream fos = new FileOutputStream(destination)) {
+                 FileOutputStream fos = new FileOutputStream(tempFile)) {
                 fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
             }
-            System.out.println("Download complete.");
+
+            // Validate the completed download before replacing the real JAR.
+            if (!isValidJar(tempFile)) {
+                throw new Exception("SSFML: Downloaded file is not a valid JAR");
+            }
+
+            Files.move(
+                    tempFile.toPath(),
+                    destination.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
+            );
+
+            System.out.println("SSFML: Download complete.");
             return true;
         } catch (Exception e) {
-            System.err.println("Failed to download " + destination.getName() + " from " + urlString + ": " + e.getMessage());
+            System.err.println("SSFML: Failed to download " + destination.getName()
+                    + " from " + urlString + ": " + e.getMessage());
+
+            // Remove any incomplete download so it cannot be mistaken for a valid dependency.
+            if (tempFile.exists() && !tempFile.delete()) {
+                System.err.println("SSFML: Could not remove incomplete download: "
+                        + tempFile.getAbsolutePath());
+            }
+
             return false;
         }
     }
@@ -267,7 +352,7 @@ public class KnotLauncher {
                 // Skip the fabric.mod.json ONLY if this is the fabric-loader jar
                 // This prevents the "Mods share ID"
                 if (jarFile.getName().contains("fabric-loader") && name.equals("fabric.mod.json")) {
-                    System.out.println("Stripping fabric.mod.json from " + jarFile.getName() + " to prevent conflict.");
+                    System.out.println("SSFML: Stripping fabric.mod.json from " + jarFile.getName() + " to prevent conflict.");
                     continue;
                 }
                 zout.putNextEntry(new ZipEntry(name));
@@ -311,12 +396,12 @@ public class KnotLauncher {
                             fos.write(buffer, 0, len);
                         }
                     }
-                    System.out.println("Successfully extracted: " + name);
+                    System.out.println("SSFML: Successfully extracted: " + name);
                 }
                 zin.closeEntry();
             }
         } catch (IOException e) {
-            System.err.println("Failed to unpack internal libs from: " + gameJar.getName());
+            System.err.println("SSFML: Failed to unpack internal libs from: " + gameJar.getName());
             e.printStackTrace();
         }
     }
