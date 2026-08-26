@@ -10,7 +10,6 @@ import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -44,27 +43,18 @@ public class KnotLauncher {
      * Builds the Fabric/Knot launch command using:
      * - the game JAR
      * - extracted runtime libs
-     * - only enabled mods from the staged folder
+     * - mods/ directly, after syncing enable/disable state onto the files there
      */
     public static void launch(String gameJarPath, String bridgeJarPath) {
         File gameFolder = new File(gameJarPath).getParentFile();
         File modsFolder = new File(gameFolder, "mods");
-        File stagingFolder = new File(gameFolder, "sectorspacebridge_enabled_mods");
 
         String javaBin = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
         ModLoader mLoader = new ModLoader();
 
         try {
-            if (stagingFolder.exists()) {
-                deleteRecursively(stagingFolder);
-            }
-            Files.createDirectories(stagingFolder.toPath());
-
-            List<File> enabledMods = mLoader.getEnabledModFiles(gameFolder);
-            for (File mod : enabledMods) {
-                File target = new File(stagingFolder, mod.getName());
-                stageEnabledMod(mod, target);
-            }
+            // Syncs mod_list.cfg against mods/ and renames each jar in place to match its true/false state (.jar <-> .jar.disabled).
+            mLoader.applyModState(gameFolder);
 
             List<String> cpParts = new ArrayList<>();
             cpParts.add(new File(bridgeJarPath).getAbsolutePath());
@@ -82,24 +72,13 @@ public class KnotLauncher {
                 }
             }
 
-            if (stagingFolder.exists()) {
-                File[] stagedJars = stagingFolder.listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".jar"));
-                if (stagedJars != null) {
-                    for (File jar : stagedJars) {
-                        if (!cpParts.contains(jar.getAbsolutePath())) {
-                            cpParts.add(jar.getAbsolutePath());
-                        }
-                    }
-                }
-            }
-
             String finalCp = String.join(File.pathSeparator, cpParts);
 
             List<String> pbCommand = new ArrayList<>();
             pbCommand.add(javaBin);
             pbCommand.add("-Djava.library.path=" + new File(gameFolder, "natives").getAbsolutePath());
             pbCommand.add("-Dfabric.gameJarPath=" + gameJarPath);
-            pbCommand.add("-Dfabric.addMods=" + stagingFolder.getAbsolutePath());
+            pbCommand.add("-Dfabric.modsFolder=" + modsFolder.getAbsolutePath());
             pbCommand.add("-cp");
             pbCommand.add(finalCp);
             pbCommand.add("net.fabricmc.loader.impl.launch.knot.KnotClient");
@@ -108,7 +87,7 @@ public class KnotLauncher {
             pb.directory(gameFolder);
             pb.inheritIO();
 
-            System.out.println("Launching Fabric using staged enabled mods: " + stagingFolder.getAbsolutePath());
+            System.out.println("Launching Fabric with mods/ (enabled mods only): " + modsFolder.getAbsolutePath());
             pb.start();
             System.exit(0);
 
@@ -131,13 +110,15 @@ public class KnotLauncher {
         if (!libsDir.exists()) libsDir.mkdirs();
 
         String[] requiredLibs = {
-            "fabric-loader-0.18.4.jar",
-            "sponge-mixin-0.15.3+mixin.0.8.7.jar",
-            "asm-9.9.jar",
-            "asm-analysis-9.9.jar",
-            "asm-commons-9.9.jar",
-            "asm-tree-9.9.jar",
-            "asm-util-9.9.jar"};
+                "fabric-loader-0.18.4.jar",
+                "sponge-mixin-0.15.3+mixin.0.8.7.jar",
+                "asm-9.9.jar",
+                "asm-analysis-9.9.jar",
+                "asm-commons-9.9.jar",
+                "asm-tree-9.9.jar",
+                "asm-util-9.9.jar"};
+
+        List<String> failedLibs = new ArrayList<>();
 
         for (String libName : requiredLibs) {
             File target = new File(libsDir, libName);
@@ -151,38 +132,94 @@ public class KnotLauncher {
                     } else {
                         System.out.println(libName + " not in JAR. Attempting download...");
                     }
-                    String baseUrl = "";
-                    if (libName.contains("fabric-loader")) {
-                        baseUrl = "https://maven.fabricmc.net/net/fabricmc/fabric-loader/0.18.4/fabric-loader-0.18.4.jar";
-                    } else if (libName.contains("sponge-mixin")) {
-                        baseUrl = "https://maven.fabricmc.net/net/fabricmc/sponge-mixin/0.15.3%2Bmixin.0.8.7/sponge-mixin-0.15.3%2Bmixin.0.8.7.jar";
-                    } else if (libName.contains("asm-9.9")) {
-                        baseUrl = "https://repository.ow2.org/nexus/service/local/repositories/releases/content/org/ow2/asm/asm/9.9/asm-9.9.jar";
-                    } else if (libName.contains("asm-analysis")) {
-                        baseUrl = "https://repository.ow2.org/nexus/service/local/repositories/releases/content/org/ow2/asm/asm-analysis/9.9/asm-analysis-9.9.jar";
-                    } else if (libName.contains("asm-commons")) {
-                        baseUrl = "https://repository.ow2.org/nexus/service/local/repositories/releases/content/org/ow2/asm/asm-commons/9.9/asm-commons-9.9.jar";
-                    } else if (libName.contains("asm-tree")) {
-                        baseUrl = "https://repository.ow2.org/nexus/service/local/repositories/releases/content/org/ow2/asm/asm-tree/9.9/asm-tree-9.9.jar";
-                    } else if (libName.contains("asm-util")) {
-                        baseUrl = "https://repository.ow2.org/nexus/service/local/repositories/releases/content/org/ow2/asm/asm-util/9.9/asm-util-9.9.jar";
-                    }
+
+                    // Checks primary URL then secondary URL, if both don't work print an error.
+                    List<String> urls = getUrls(libName);
+
                     if (!target.exists()) {
                         System.out.println(libName + " not in JAR. Attempting download...");
-                        downloadLib(baseUrl, target);
+                        boolean downloaded = false;
+                        for (String url : urls) {
+                            downloaded = downloadLib(url, target);
+                            if (downloaded) {
+                                break;
+                            }
+                            System.out.println("Retrying " + libName + " from a different source...");
+                        }
+                        if (downloaded) {
+                            stripSignatures(target);
+                        } else {
+                            failedLibs.add(libName + " (tried: " + String.join(", ", urls) + ")");
+                        }
                     }
                 } catch (Exception e) {
                     System.err.println("Error handling " + libName);
                     e.printStackTrace();
+                    failedLibs.add(libName + " (exception: " + e.getMessage() + ")");
                 }
             }
+        }
+
+        if (!failedLibs.isEmpty()) {
+            writeLibErrorReport(gameFolder, failedLibs);
+        }
+    }
+
+    // Lib backup Urls.
+    private static List<String> getUrls(String libName) {
+        List<String> urls = new ArrayList<>();
+        if (libName.contains("fabric-loader")) {
+            urls.add("https://maven.fabricmc.net/net/fabricmc/fabric-loader/0.18.4/fabric-loader-0.18.4.jar");
+            urls.add("https://repo1.maven.org/maven2/net/fabricmc/fabric-loader/0.18.4/fabric-loader-0.18.4.jar");
+        } else if (libName.contains("sponge-mixin")) {
+            urls.add("https://maven.fabricmc.net/net/fabricmc/sponge-mixin/0.15.3%2Bmixin.0.8.7/sponge-mixin-0.15.3%2Bmixin.0.8.7.jar");
+            urls.add("https://repo1.maven.org/maven2/net/fabricmc/sponge-mixin/0.15.3%2Bmixin.0.8.7/sponge-mixin-0.15.3%2Bmixin.0.8.7.jar");
+        } else if (libName.contains("asm-9.9")) {
+            urls.add("https://repository.ow2.org/nexus/service/local/repositories/releases/content/org/ow2/asm/asm/9.9/asm-9.9.jar");
+            urls.add("https://repo1.maven.org/maven2/org/ow2/asm/asm/9.9/asm-9.9.jar");
+        } else if (libName.contains("asm-analysis")) {
+            urls.add("https://repository.ow2.org/nexus/service/local/repositories/releases/content/org/ow2/asm/asm-analysis/9.9/asm-analysis-9.9.jar");
+            urls.add("https://repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.9/asm-analysis-9.9.jar");
+        } else if (libName.contains("asm-commons")) {
+            urls.add("https://repository.ow2.org/nexus/service/local/repositories/releases/content/org/ow2/asm/asm-commons/9.9/asm-commons-9.9.jar");
+            urls.add("https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.9/asm-commons-9.9.jar");
+        } else if (libName.contains("asm-tree")) {
+            urls.add("https://repository.ow2.org/nexus/service/local/repositories/releases/content/org/ow2/asm/asm-tree/9.9/asm-tree-9.9.jar");
+            urls.add("https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.9/asm-tree-9.9.jar");
+        } else if (libName.contains("asm-util")) {
+            urls.add("https://repository.ow2.org/nexus/service/local/repositories/releases/content/org/ow2/asm/asm-util/9.9/asm-util-9.9.jar");
+            urls.add("https://repo1.maven.org/maven2/org/ow2/asm/asm-util/9.9/asm-util-9.9.jar");
+        }
+        return urls;
+    }
+
+    /**
+     * Writes a plain-text summary of any dependencies that couldn't be obtained.
+     */
+    private static void writeLibErrorReport(File gameFolder, List<String> failedLibs) {
+        File reportFile = new File(gameFolder, "libs_download_errors.txt");
+        StringBuilder sb = new StringBuilder();
+        sb.append("SSFML could not obtain the following required libraries:\n\n");
+        for (String entry : failedLibs) {
+            sb.append(" - ").append(entry).append("\n");
+        }
+        sb.append("\nThe game will likely fail to launch until these are placed manually in:\n");
+        sb.append(new File(gameFolder, "libs").getAbsolutePath()).append("\n");
+        sb.append("\nCheck your internet connection and try again, or download the jar(s) above manually.\n");
+
+        try {
+            Files.writeString(reportFile.toPath(), sb.toString());
+            System.err.println("SSFML: Some dependencies failed to download. See " + reportFile.getAbsolutePath());
+        } catch (IOException e) {
+            System.err.println("SSFML: failed to write lib error report: " + e.getMessage());
         }
     }
 
     /**
      * Downloads a Fabric/ASM dependency into the target folder.
+     * Returns true on success, false on any failure.
      */
-    private static void downloadLib(String urlString, File destination) {
+    private static boolean downloadLib(String urlString, File destination) {
         try {
             System.out.println("Downloading: " + destination.getName() + "...");
             URL website = new URL(urlString);
@@ -205,9 +242,10 @@ public class KnotLauncher {
                 fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
             }
             System.out.println("Download complete.");
+            return true;
         } catch (Exception e) {
-            System.err.println("Failed to download " + destination.getName());
-            e.printStackTrace();
+            System.err.println("Failed to download " + destination.getName() + " from " + urlString + ": " + e.getMessage());
+            return false;
         }
     }
 
@@ -226,8 +264,8 @@ public class KnotLauncher {
                 if (name.startsWith("META-INF/") && (name.endsWith(".SF") || name.endsWith(".RSA") || name.endsWith(".DSA"))) {
                     continue;
                 }
-                // 2. NEW: Skip the fabric.mod.json ONLY if this is the fabric-loader jar
-                // This prevents the "Mods share ID" conflict we saw earlier
+                // Skip the fabric.mod.json ONLY if this is the fabric-loader jar
+                // This prevents the "Mods share ID"
                 if (jarFile.getName().contains("fabric-loader") && name.equals("fabric.mod.json")) {
                     System.out.println("Stripping fabric.mod.json from " + jarFile.getName() + " to prevent conflict.");
                     continue;
@@ -283,35 +321,4 @@ public class KnotLauncher {
         }
     }
 
-    /**
-     * Deletes a folder tree recursively.
-     */
-    private static void deleteRecursively(File file) throws IOException {
-        if (file.isDirectory()) {
-            File[] children = file.listFiles();
-            if (children != null) {
-                for (File child : children) {
-                    deleteRecursively(child);
-                }
-            }
-        }
-        Files.deleteIfExists(file.toPath());
-    }
-
-    /**
-     * Stages an enabled mod into a temporary folder as a real JAR file.
-     * If a hard link is unsupported, this falls back to a normal file copy.
-     */
-    private static void stageEnabledMod(File src, File dst) throws IOException {
-        if (Files.exists(dst.toPath())) {
-            Files.delete(dst.toPath());
-        }
-
-        try {
-            Files.createLink(dst.toPath(), src.toPath());
-        } catch (UnsupportedOperationException | IOException ex) {
-            Files.copy(src.toPath(), dst.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        }
-    }
 }
-
