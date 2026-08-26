@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "sectorspacebridge",
+  "version": "1.0.0",
+  "name": "Space Sector Bridge",
+  "description": "Modding a non-Minecraft Java App",
+  "license": "MIT",
+  "icon": "assets/modid/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.sector.bridge.ModLoader",
+      "com.sector.bridge.SectorSpaceProvider"
+    ]
+  },
+  "mixins": [
+    "sectorspacebridge.mixins.json"
+  ],
+  "depends": {
+    "java": ">=25"
+  },
+  "custom": {
+    "fabric-loader:parent": {
+      "mainClass": "game.Main" 
+    }
+  }
+}

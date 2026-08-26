@@ -1,0 +1,30 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "type": "java",
+            "name": "Launch Bridge",
+            "request": "launch",
+            "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+            "projectName": "app",
+            "classPaths": [
+                "${workspaceFolder}/app/build/resources/main",
+                "${workspaceFolder}/app/build/classes/java/main",
+                "${workspaceFolder}/app/libs/fabric-loader-0.18.4.jar",
+                "${workspaceFolder}/app/libs/tiny-mappings-parser-0.3.0.jar",
+                "${workspaceFolder}/app/libs/asm-9.9.jar",
+                "${workspaceFolder}/app/libs/asm-tree-9.9.jar",
+                "${workspaceFolder}/app/libs/asm-commons-9.9.jar",
+                "${workspaceFolder}/app/libs/asm-analysis-9.9.jar",
+                "${workspaceFolder}/app/libs/asm-util-9.9.jar",
+                "${workspaceFolder}/app/libs/sponge-mixin-0.15.3-mixin.0.8.7.jar",
+                "${workspaceFolder}/app/libs/Sector Space.jar",
+            ],
+            "vmArgs": "-Dfabric.log.level=debug -Dfabric.loader.forceUnsigned=true -Dfabric.development=true -Dfabric.remap=false -Dfabric.skipMcProvider=true -Dfabric.mappings=\"${workspaceFolder}/app/src/main/resources/mappings.tiny\" -Dfabric.gameJarPath=\"${workspaceFolder}/Sector Space.jar\""    
+        }
+    ]
+}

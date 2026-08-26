@@ -1,0 +1,277 @@
+Loaded saves/tracker.dat
+Loaded settings.ini
+Saved settings.ini
+Checked: lwjgl64.dll
+Checked: OpenAL64.dll
+Checked: jinput-dx8_64.dll
+Checked: jinput-raw_64.dll
+Illuminatus V1.8.0.3 - Java Software Engine
+Developed by: Robin M. Farrell
+Sector Space version: 0.5.9.6 (c) 2026
+Initializing OpenAL audio...
+Initializing display...
+Desktop resolution: 1920, 1080
+Window resolution: 1024, 768
+Initializing OpenGL graphics...
+Operating System: Windows 11
+OpenGL Version: 4.6.0 Compatibility Profile Context 26.3.1.260303
+Frame buffers are supported.
+Enabling surfaces...
+* Warning: No Fonts pre-loader assigned, call Loader.assignFontsPreLoader(Loader loader) method before Engine.begin(...
+
+Loading sounds... 
+  [0] Loaded Sound: sounds/title_music.ogg
+  [1] Loaded Sound: sounds/space_song_1.ogg
+  [2] Loaded Sound: sounds/space_song_2.ogg
+  [3] Loaded Sound: sounds/space_song_3.ogg
+  [4] Loaded Sound: sounds/space_song_4.ogg
+  [5] Loaded Sound: sounds/space_song_5.ogg
+  [6] Loaded Sound: sounds/space_song_6.ogg
+  [7] Loaded Sound: sounds/space_song_7.ogg
+  [8] Loaded Sound: sounds/space_song_8.ogg
+  [9] Loaded Sound: sounds/space_song_9.ogg
+  [10] Loaded Sound: sounds/space_song_10.ogg
+  [11] Loaded Sound: sounds/space_song_11.ogg
+  [12] Loaded Sound: sounds/space_song_12.ogg
+  [13] Loaded Sound: sounds/space_song_13.ogg
+  [14] Loaded Sound: sounds/space_song_14.ogg
+  [15] Loaded Sound: sounds/transfer_item.wav
+  [16] Loaded Sound: sounds/select.wav
+  [17] Loaded Sound: sounds/coin_get.wav
+  [18] Loaded Sound: sounds/repair_item.wav
+  [19] Loaded Sound: sounds/recycle_item.wav
+  [20] Loaded Sound: sounds/sell_item.wav
+  [21] Loaded Sound: sounds/pickup_item.wav
+  [22] Loaded Sound: sounds/snap_click.wav
+  [23] Loaded Sound: sounds/click.wav
+  [24] Loaded Sound: sounds/level.wav
+  [25] Loaded Sound: sounds/scoop_up.wav
+  [26] Loaded Sound: sounds/drop.wav
+  [27] Loaded Sound: sounds/ore_refine.wav
+  [28] Loaded Sound: sounds/factory_make.wav
+  [29] Loaded Sound: sounds/scoop_gas.wav
+  [30] Loaded Sound: sounds/mission_start.wav
+  [31] Loaded Sound: sounds/mission_end.wav
+  [32] Loaded Sound: sounds/colony_nuke.wav
+  [33] Loaded Sound: sounds/colony_purchase.wav
+  [34] Loaded Sound: sounds/construct_item.wav
+  [35] Loaded Sound: sounds/wormhole_jump.wav
+  [36] Loaded Sound: sounds/process_efx.wav
+  [37] Loaded Sound: sounds/power_down.wav
+  [38] Loaded Sound: sounds/power_up.wav
+  [39] Loaded Sound: sounds/power_up_rev.wav
+  [40] Loaded Sound: sounds/discovered.wav
+  [41] Loaded Sound: sounds/scanned.wav
+  [42] Loaded Sound: sounds/Explosion_1.wav
+  [43] Loaded Sound: sounds/Explosion_2.wav
+  [44] Loaded Sound: sounds/Explosion_3.wav
+  [45] Loaded Sound: sounds/Explosion_4.wav
+  [46] Loaded Sound: sounds/Explosion_5.wav
+  [47] Loaded Sound: sounds/beam_hum.wav
+  [48] Loaded Sound: sounds/disruptor.wav
+  [49] Loaded Sound: sounds/plasma_cannon.wav
+  [50] Loaded Sound: sounds/plasma_shotgun.wav
+  [51] Loaded Sound: sounds/rail_gun.wav
+  [52] Loaded Sound: sounds/laser_beam.wav
+  [53] Loaded Sound: sounds/beam_pulse.wav
+Loaded 54/54 sounds successfully.
+* Warning: No Surface pre-loader assigned, call Loader.assignSurfacePreLoader(Loader loader) method before Engine.begin(...
+
+Loading textures... 
+  Loaded texture: outervisiongames_logoV2_small.png
+  Loaded texture: logo.png
+  Loaded texture: window_backing.png
+  Loaded texture: window_backing2.png
+  Loaded texture: window_backing3.png
+  Loaded texture: window_backing4.png
+  Loaded texture: grid_box.png
+  Loaded texture: bar_base.png
+  Loaded texture: bar_bar.png
+  Loaded texture: bar_bar2.png
+  Loaded texture: pointer.png
+  Loaded texture: dash.png
+  Loaded texture: arrowLeft.png
+  Loaded texture: arrowRight.png
+  Loaded texture: arrowBoth.png
+  Loaded texture: windowResize.png
+  Loaded texture: windowResize2.png
+  Loaded texture: exit_icon.png
+  Loaded texture: pin_icon.png
+  Loaded texture: fav_icon.png
+  Loaded texture: ship_swap_arrow.png
+  Loaded texture: search_icon.png
+  Loaded texture: mouse.png
+  Loaded texture: mail_open_attach.png
+  Loaded texture: mail_open_no_attach.png
+  Loaded texture: mail_close_attach.png
+  Loaded texture: mail_close_no_attach.png
+  Loaded texture: buy_icon16.png
+  Loaded texture: sell_icon16.png
+  Loaded texture: recycle_icon16.png
+  Loaded texture: InformationButton.png
+  Loaded texture: help_button.png
+  Loaded texture: scoop_button.png
+  Loaded texture: scooping_button.png
+  Loaded texture: ScoopCargoShipButton.png
+  Loaded texture: NoScoopCargoShipButton.png
+  Loaded texture: Ship_FireWeapon16.png
+  Loaded texture: Ship_NoWeapons16.png
+  Loaded texture: Ship_Guard16.png
+  Loaded texture: Ship_Follow16.png
+  Loaded texture: deploy_to_fleet.png
+  Loaded texture: Ship_Cloaked16.png
+  Loaded texture: Ship_UnCloaked16.png
+  Loaded texture: Ship_Interact16.png
+  Loaded texture: mark_as_enemy16.png
+  Loaded texture: mark_as_friend16.png
+  Loaded texture: clear_markers16.png
+  Loaded texture: travel_button.png
+  Loaded texture: jumping_button.png
+  Loaded texture: uncloaked_button.png
+  Loaded texture: cloaked_button.png
+  Loaded texture: follow_shoot_button.png
+  Loaded texture: follow_no_shoot_button.png
+  Loaded texture: fleet_button_wait.png
+  Loaded texture: fleet_button_guard.png
+  Loaded texture: peace_button.png
+  Loaded texture: fighter_recall_button.png
+  Loaded texture: automine_on_button.png
+  Loaded texture: automine_off_button.png
+  Loaded texture: automine_on_max_button.png
+  Loaded texture: automine_target_button.png
+  Loaded texture: automine_on_button-s.png
+  Loaded texture: automine_off_button-s.png
+  Loaded texture: automine_on_max_button-s.png
+  Loaded texture: automine_target_button-s.png
+  Loaded texture: player_weapon_button_on.png
+  Loaded texture: player_weapon_button_off.png
+  Loaded texture: checkbox_on.png
+  Loaded texture: checkbox_off.png
+  Loaded texture: tether_off_button.png
+  Loaded texture: empty_button32.png
+  Loaded texture: empty_button.png
+  Loaded texture: highlight_button32.png
+  Loaded texture: highlight_button24.png
+  Loaded texture: highlight_button16.png
+  Loaded texture: highlight_button16L.png
+  Loaded texture: SwapShipLargeButton.png
+  Loaded texture: DisbandShipLargeButton.png
+  Loaded texture: MapSelButton.png
+  Loaded texture: RadarSelButton.png
+  Loaded texture: InventorySelButton.png
+  Loaded texture: InventoryInstallButton.png
+  Loaded texture: InventoryUninstallButton.png
+  Loaded texture: EquipmentSelButton2.png
+  Loaded texture: DisbandShipButton.png
+  Loaded texture: SwapShipButton.png
+  Loaded texture: StoreShipButton.png
+  Loaded texture: AddPointButton.png
+  Loaded texture: RemovePointButton.png
+  Loaded texture: GameSettingsButton.png
+  Loaded texture: GameSettingsButtonCancel.png
+  Loaded texture: tether_on_button.png
+  Loaded texture: toggle_equipstatus_view.png
+  Loaded texture: toggle_cargo_view.png
+  Loaded texture: toggle_character_view.png
+  Loaded texture: Ship_Target16.png
+  Loaded texture: button_to_sell.png
+  Loaded texture: button_to_recycle.png
+  Loaded texture: button_to_station.png
+  Loaded texture: button_to_target.png
+  Loaded texture: button_to_target_all.png
+  Loaded texture: button_to_station_all.png
+  Loaded texture: button_to_split.png
+  Loaded texture: button_to_combine.png
+  Loaded texture: button_to_eject.png
+  Loaded texture: button_to_use.png
+  Loaded texture: button_to_fabricator.png
+  Loaded texture: button_to_fabricator_all.png
+  [0] Loaded 14 textures: target_icons/icon0.png
+  [1] Loaded 3 textures: box20_0.png
+  Loaded texture: target_icons/mission_icon.png
+  Loaded texture: target_icons/boss_icon.png
+  Loaded texture: target_icons/pirate_icon.png
+  Loaded texture: target_icons/police_icon.png
+  Loaded texture: target_icons/star_icon.png
+  Loaded texture: effects/missile_efx.png
+  Loaded texture: effects/particle_glow.png
+  Loaded texture: effects/fighter_thrust.png
+  Loaded texture: effects/grabber_open.png
+  Loaded texture: effects/grabber_close.png
+  Loaded texture: sun/sun_flare.png
+  Loaded texture: sun/sun_flare2.png
+  Loaded texture: sun/sun_flare3.png
+  Loaded texture: sun/sun_flare4.png
+  Loaded texture: items/credit_drop.png
+  Loaded texture: items/credit_glow.png
+  Loaded texture: glow16.png
+  [2] Loaded 6 textures: effects/debris0.png
+  Loaded texture: effects/plasma_pellet.png
+  Loaded texture: effects/plasma_pellet_2.png
+  Loaded texture: effects/laser_beam.png
+  Loaded texture: effects/ray_beam.png
+  Loaded texture: effects/laser_beam2.png
+  Loaded texture: effects/explode_particle.png
+  Loaded texture: effects/flame_particle.png
+  Loaded texture: effects/shooting_star.png
+  Loaded texture: effects/shield_glow.png
+  Loaded texture: effects/shield_transfer.png
+  Loaded texture: effects/shield_glow_directional.png
+  [3] Loaded 7 textures: effects/wormhole0.png
+  [4] Loaded 3 textures: effects/shield_demod0.png
+  [5] Loaded 3 textures: effects/tether_grab0.png
+  [6] Loaded 6 textures: effects/laser_pulse_0.png
+  Loaded texture: effects/laser_light.png
+  Loaded texture: effects/flash.png
+  Loaded texture: effects/blast_wake.png
+  Loaded texture: effects/blast_ring.png
+  [7] Loaded 4 textures: effects/arc0.png
+  Loaded texture: effects/ion_storm.png
+  [8] Loaded 10 textures: nebula/nebula_particle_0.png
+  [9] Loaded 4 textures: effects/bolt0.png
+  [10] Loaded 9 textures: effects/fighter_efx0.png
+  [11] Loaded 11 textures: roids/roid0.png
+  [12] Loaded 10 textures: roids/ice_roid0.png
+  [13] Loaded 10 textures: roids/ruins_0.png
+  [14] Loaded 10 textures: roids/exo_roid0.png
+  [15] Loaded 6 textures: roids/infected_0.png
+  [16] Loaded 6 textures: roids/big_debris_0.png
+  [17] Loaded 10 textures: roids/wreck_0.png
+  [18] Loaded 10 textures: roids/inf_roid0.png
+  [19] Loaded 10 textures: roids/cryst_roid0.png
+  [20] Loaded 5 textures: roids/organic_tile0.png
+  [21] Loaded 5 textures: roids/asteroid_tile0.png
+  [22] Loaded 5 textures: roids/ice_tile0.png
+  [23] Loaded 9 textures: sun/sun0.png
+  [24] Loaded 6 textures: sun/sun_shine0.png
+  [25] Loaded 8 textures: planets/moon-0.png
+  [26] Loaded 5 textures: planets/col0.png
+  Loaded texture: effects/planet_shadow.png
+  Loaded texture: planets/atmosphere.png
+  Loaded texture: effects/planet_shine.png
+  [27] Loaded 3 textures: planets/ring_top-0.png
+  [28] Loaded 3 textures: planets/ring_bot-0.png
+  [29] Loaded 4 textures: asteroid_tile0.png
+  Loaded texture: items/items.png
+  Loaded texture: modifiedFontOutlined2.png
+Loaded 205/205 indexed textures successfully.
+Loaded 74 planets.
+Loading weapon layouts...
+Compiling modifier descriptions...
+Loaded resources/data/item_data.dat
+Loaded 300 ships from database.
+Generating drop tables for Tier 0...
+Generating drop tables for Tier 1...
+Generating drop tables for Tier 2...
+Generating drop tables for Tier 3...
+Generating drop tables for Tier 4...
+Generating drop tables for Tier 5...
+Generating drop tables for Tier 6...
+Loaded resources/data/market_data.dat
+Recycling Station Market Index updated.
+Recycling Station Market Index updated.
+Recycling Station Market Index updated.
+Loaded .\saves\characterSave1.chr
+* Error: shipIndex -1 not found in Database, returning default instance of ShipStats.
+Loaded settings.ini
+Saved settings.ini

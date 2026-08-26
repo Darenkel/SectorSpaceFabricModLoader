@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.sector.bridge.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": [
+    "MainMenuMixin",
+    "ModManagerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
