@@ -10,5 +10,6 @@ build
 out/
 bin/
 .vscode/
+.idea/
 *.class
 *.log
