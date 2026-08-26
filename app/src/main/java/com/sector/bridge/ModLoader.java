@@ -6,12 +6,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.StringJoiner;
 
 /**
  * This owns the mods/mod_list.cfg and enforces its true/false state directly on the files in mods/
@@ -29,7 +26,7 @@ import java.util.StringJoiner;
 
 public class ModLoader {
 
-    private static final String CONFIG_HEADER = "# Auto-generated mod list, start game to update.\n# Otherwise, add in per-line formate: ExJar.jar, true/false.\n";
+    private static final String CONFIG_HEADER = "# Auto-generated mod list, start game to update.\n# Otherwise, add in per-line format: ExJar.jar, true/false.\n";
     private static final String DISABLED_SUFFIX = ".disabled";
 
     /**
