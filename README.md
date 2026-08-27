@@ -6,6 +6,8 @@ Use VSCode or Intellij IDEA, personally I'm using IDEA.
 
 To build run the gradle app:jar
 
+You might need to drop your own Sector Space.jar in to app\build\libs
+
 Place app.jar into game directory or wherever to make it work.
 
 To mod on this fork:
