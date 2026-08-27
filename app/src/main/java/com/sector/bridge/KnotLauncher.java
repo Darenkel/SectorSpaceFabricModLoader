@@ -29,6 +29,10 @@ public class KnotLauncher {
             bridgeJarPath = new File(KnotLauncher.class.getProtectionDomain().getCodeSource().getLocation().getPath()).getAbsolutePath();
         }
 
+        // Mirror all SSFML console output to SSFML_startup_log.txt.
+        File logTargetFolder = (savedPath != null) ? new File(savedPath).getParentFile() : new File(System.getProperty("user.dir"));
+        StartupLogger.install(logTargetFolder);
+
         if (savedPath == null || !new File(savedPath).exists()) {
             System.out.println("SSFML: Game not found. Opening Setup UI...");
             LocVerifierApp.main(new String[0]);
@@ -38,6 +42,7 @@ public class KnotLauncher {
             launch(savedPath, bridgeJarPath);
         }
     }
+
 
     /**
      * Builds the Fabric/Knot launch command using:

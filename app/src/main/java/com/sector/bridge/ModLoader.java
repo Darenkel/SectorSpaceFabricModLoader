@@ -6,7 +6,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -73,8 +76,35 @@ public class ModLoader {
                 }
             }
 
+            logMountedMods(rebuilt);
+
         } catch (IOException e) {
             System.err.println("SSFML: failed applying mod state: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Prints the full set of currently-enabled mods every launch,
+     * not just the ones that changed state this run.
+     * So the startup log always shows a more complete picture of what's actually about to load.
+     */
+    private void logMountedMods(Map<String, Boolean> rebuilt) {
+        List<String> mounted = new ArrayList<>();
+        for (Map.Entry<String, Boolean> entry : rebuilt.entrySet()) {
+            if (entry.getValue()) {
+                mounted.add(entry.getKey());
+            }
+        }
+        Collections.sort(mounted, String.CASE_INSENSITIVE_ORDER);
+
+        if (mounted.isEmpty()) {
+            System.out.println("SSFML: No mods enabled.");
+            return;
+        }
+
+        System.out.println("SSFML: Enabled " + mounted.size() + " mod(s):");
+        for (String name : mounted) {
+            System.out.println("SSFML:  - " + name);
         }
     }
 

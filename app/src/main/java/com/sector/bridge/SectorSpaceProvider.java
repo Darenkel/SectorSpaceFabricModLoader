@@ -38,10 +38,10 @@ public class SectorSpaceProvider implements GameProvider {
 
             // Check if either vital piece of info is missing
         if (LocVerifierCFG.getProperty("game_path") == null || LocVerifierCFG.getProperty("game_version") == null) {
-            System.out.println("Configuration missing. Launching setup UI...");
+            System.out.println("Bridge: Configuration missing. Launching setup UI...");
             LocVerifierApp.main(new String[0]);
         } else {
-            System.out.println("Game Path and Version verified.");
+            System.out.println("Bridge: Game Path and Version verified.");
             ensureModsFolder();
             libChecker();
         }
@@ -118,7 +118,7 @@ public void initialize(net.fabricmc.loader.impl.launch.FabricLauncher launcher) 
     // 2. THE FINAL INTEGRATION GOES HERE:
     if (this.gameJarPath != null) {
         java.nio.file.Path libPath = this.gameJarPath.getParent().resolve("natives");
-        System.out.println("Checking for libs at: " + libPath.toAbsolutePath());
+        System.out.println("Bridge: Checking for libs at: " + libPath.toAbsolutePath());
 
         if (java.nio.file.Files.exists(libPath)) {
             // STEP A: ADD THE JARS
@@ -193,7 +193,7 @@ public void libChecker() {
 
     // Prefer valid libraries already present in the local Gradle cache.
     if (isMissingLibraries(libsFolder)) {
-        System.out.println("Libraries missing from /libs. Scanning Gradle cache...");
+        System.out.println("Bridge: Libraries missing from /libs. Scanning Gradle cache...");
         syncLibrariesFromCache(libsFolder);
     }
 
