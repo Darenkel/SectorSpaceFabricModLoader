@@ -52,7 +52,7 @@ public final class StartupLogger {
             System.setOut(teeOut);
             System.setErr(teeErr);
 
-            teeOut.println("SSFML: Startup log opened at " + logFile.getAbsolutePath() + (append ? " (appending)" : ""));
+            teeOut.println("SSFML: Startup log created at: " + logFile.getAbsolutePath() + (append ? " (appending)" : ""));
         } catch (IOException e) {
             System.err.println("SSFML: Could not open " + LOG_FILE_NAME + ", continuing without file logging: " + e.getMessage());
         }

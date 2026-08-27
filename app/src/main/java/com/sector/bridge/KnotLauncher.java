@@ -92,7 +92,7 @@ public class KnotLauncher {
             pb.directory(gameFolder);
             pb.inheritIO();
 
-            System.out.println("SSFML: Launching Fabric with mods/ (enabled mods only): " + modsFolder.getAbsolutePath());
+            System.out.println("SSFML: Launching Fabric with enabled mods in: " + modsFolder.getAbsolutePath());
             pb.start();
             System.exit(0);
 

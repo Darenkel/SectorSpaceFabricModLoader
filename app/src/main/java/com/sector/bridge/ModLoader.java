@@ -79,7 +79,7 @@ public class ModLoader {
             logMountedMods(rebuilt);
 
         } catch (IOException e) {
-            System.err.println("SSFML: failed applying mod state: " + e.getMessage());
+            System.err.println("SSFML: Failed applying mod state: " + e.getMessage());
         }
     }
 
@@ -147,8 +147,8 @@ public class ModLoader {
             String loserPath = loser.getAbsolutePath();
 
             if (Files.deleteIfExists(loser.toPath())) {
-                System.out.println("SSFML: found both an enabled and disabled copy of " + canonicalName
-                        + " -- kept the " + (shouldBeEnabled ? "enabled" : "disabled")
+                System.out.println("SSFML: Found both an enabled and disabled copy of " + canonicalName
+                        + "kept the " + (shouldBeEnabled ? "enabled" : "disabled")
                         + " one per mod_list.cfg and deleted " + loserPath);
             }
         }
