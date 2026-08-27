@@ -26,6 +26,14 @@ public final class StartupLogger {
      * real stderr rather than failing the whole launch over a logging problem.
      */
     public static synchronized void install(File gameFolder) {
+        install(gameFolder, false);
+    }
+
+    /**
+     * Installs the tee. Pass append=true when a separate process (SectorSpaceProvider, running in the child JVM Knot spawns)
+     * needs to keep writing to the same log file the launcher process already opened for this launch, instead of starting a second one.
+     */
+    public static synchronized void install(File gameFolder, boolean append) {
         if (System.out instanceof TeePrintStream) {
             return;
         }
@@ -33,8 +41,7 @@ public final class StartupLogger {
         File logFile = new File(gameFolder, LOG_FILE_NAME);
 
         try {
-            // Fresh log per launch
-            FileOutputStream fos = new FileOutputStream(logFile, false);
+            FileOutputStream fos = new FileOutputStream(logFile, append);
 
             PrintStream realOut = System.out;
             PrintStream realErr = System.err;
@@ -45,7 +52,7 @@ public final class StartupLogger {
             System.setOut(teeOut);
             System.setErr(teeErr);
 
-            teeOut.println("SSFML: Startup log opened at " + logFile.getAbsolutePath());
+            teeOut.println("SSFML: Startup log opened at " + logFile.getAbsolutePath() + (append ? " (appending)" : ""));
         } catch (IOException e) {
             System.err.println("SSFML: Could not open " + LOG_FILE_NAME + ", continuing without file logging: " + e.getMessage());
         }
