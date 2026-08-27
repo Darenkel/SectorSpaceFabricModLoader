@@ -98,6 +98,7 @@ public class KnotLauncher {
             System.exit(0);
 
         } catch (Exception e) {
+            System.err.println("SSFML: Failed to launch game process: " + e);
             e.printStackTrace();
         }
     }
@@ -108,11 +109,8 @@ public class KnotLauncher {
     private static void ensureFabricLibs(String gameJarPath) {
         File gameFolder = new File(gameJarPath).getParentFile();
         File gameJar = new File(gameJarPath);
-        File libsFolder = new File(System.getProperty("user.dir"), "libs");
-
-        unpackInternalLibs(gameJar, libsFolder);
-
         File libsDir = new File(gameFolder, "libs");
+
         if (!libsDir.exists() && !libsDir.mkdirs()) {
             System.err.println("SSFML: Could not create libraries directory: "
                     + libsDir.getAbsolutePath());
@@ -124,6 +122,8 @@ public class KnotLauncher {
                     + libsDir.getAbsolutePath());
             return;
         }
+
+        unpackInternalLibs(gameJar, libsDir);
 
         String[] requiredLibs = {
                 "fabric-loader-0.18.4.jar",
@@ -417,6 +417,8 @@ public class KnotLauncher {
 
     /**
      * Extracts embedded runtime JARs from the game archive into a working folder.
+     * Skips any entry that's already present and passes isValidJar(), so a regular
+     * launch only touches disk for jars that are missing or corrupt.
      */
     private static void unpackInternalLibs(File gameJar, File outputDir) {
         // 1. Ensure the libs folder actually exists first
@@ -442,6 +444,16 @@ public class KnotLauncher {
                     File outputFile = new File(outputDir, name);
 
                     // 3. Extract the file using a standard buffer
+                    if (isValidJar(outputFile)) {
+                        zin.closeEntry();
+                        continue;
+                    }
+
+                    if (outputFile.exists() && !outputFile.delete()) {
+                        System.err.println("SSFML: Could not remove stale/corrupt internal lib: "
+                                + outputFile.getAbsolutePath());
+                    }
+
                     try (FileOutputStream fos = new FileOutputStream(outputFile)) {
                         byte[] buffer = new byte[4096];
                         int len;
@@ -449,13 +461,12 @@ public class KnotLauncher {
                             fos.write(buffer, 0, len);
                         }
                     }
-                    System.out.println("SSFML: Successfully extracted: " + name);
+                    System.out.println("SSFML: Successfully extracted internal lib: " + name);
                 }
                 zin.closeEntry();
             }
         } catch (IOException e) {
             System.err.println("SSFML: Failed to unpack internal libs from: " + gameJar.getName());
-            e.printStackTrace();
         }
     }
 
