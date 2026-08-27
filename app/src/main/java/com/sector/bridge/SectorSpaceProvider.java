@@ -73,9 +73,7 @@ public class SectorSpaceProvider implements GameProvider {
     }
 
     @Override
-    public String getEntrypoint() {
-        return "game.Main";
-    }
+    public String getEntrypoint() { return "game.Main"; }
 
     @Override
     public String getGameId() { return "sector-space"; }
@@ -152,19 +150,13 @@ public class SectorSpaceProvider implements GameProvider {
     public String[] getLaunchArguments(boolean server) { return this.arguments.toArray(); }
 
     @Override
-    public GameTransformer getEntrypointTransformer() {
-        return new GameTransformer();
-    }
+    public GameTransformer getEntrypointTransformer() { return new GameTransformer(); }
 
     @Override
-    public Set<BuiltinTransform> getBuiltinTransforms(String gameId) {
-        return Collections.emptySet();
-    }
+    public Set<BuiltinTransform> getBuiltinTransforms(String gameId) { return Collections.emptySet(); }
 
     @Override
-    public boolean requiresUrlClassLoader() {
-        return false;
-    }
+    public boolean requiresUrlClassLoader() { return false; }
 
     @Override
     public void unlockClassPath(FabricLauncher launcher) {

@@ -136,7 +136,7 @@ public class ModLoader {
 
         for (String canonicalName : disabledCopies.keySet()) {
             if (!enabledCopies.containsKey(canonicalName)) {
-                continue; // no duplicate -- nothing to resolve
+                continue;
             }
 
             boolean shouldBeEnabled = existing.getOrDefault(canonicalName, false);
@@ -148,7 +148,7 @@ public class ModLoader {
 
             if (Files.deleteIfExists(loser.toPath())) {
                 System.out.println("SSFML: Found both an enabled and disabled copy of " + canonicalName
-                        + "kept the " + (shouldBeEnabled ? "enabled" : "disabled")
+                        + " -- kept the " + (shouldBeEnabled ? "enabled" : "disabled")
                         + " one per mod_list.cfg and deleted " + loserPath);
             }
         }
