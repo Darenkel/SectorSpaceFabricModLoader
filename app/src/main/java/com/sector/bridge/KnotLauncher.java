@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
@@ -112,7 +113,17 @@ public class KnotLauncher {
         unpackInternalLibs(gameJar, libsFolder);
 
         File libsDir = new File(gameFolder, "libs");
-        if (!libsDir.exists()) libsDir.mkdirs();
+        if (!libsDir.exists() && !libsDir.mkdirs()) {
+            System.err.println("SSFML: Could not create libraries directory: "
+                    + libsDir.getAbsolutePath());
+            return;
+        }
+
+        if (!libsDir.isDirectory()) {
+            System.err.println("SSFML: Libraries path is not a directory: "
+                    + libsDir.getAbsolutePath());
+            return;
+        }
 
         String[] requiredLibs = {
                 "fabric-loader-0.18.4.jar",
@@ -223,11 +234,7 @@ public class KnotLauncher {
 
             // Make sure the archive can actually enumerate its contents.
             java.util.Enumeration<java.util.jar.JarEntry> entries = jar.entries();
-            if (!entries.hasMoreElements()) {
-                return false;
-            }
-
-            return true;
+            return entries.hasMoreElements();
         } catch (Exception e) {
             return false;
         }
@@ -292,7 +299,7 @@ public class KnotLauncher {
 
         try {
             System.out.println("SSFML: Downloading: " + destination.getName() + "...");
-            URL website = new URL(urlString);
+            URL website = URI.create(urlString).toURL();
 
             HttpURLConnection connection = (HttpURLConnection) website.openConnection();
             connection.setRequestProperty("User-Agent", "Mozilla/5.0");
@@ -344,37 +351,68 @@ public class KnotLauncher {
      */
     private static void stripSignatures(File jarFile) {
         File tempFile = new File(jarFile.getAbsolutePath() + ".tmp");
+
         try (ZipInputStream zin = new ZipInputStream(new FileInputStream(jarFile));
              ZipOutputStream zout = new ZipOutputStream(new FileOutputStream(tempFile))) {
 
             ZipEntry entry;
             while ((entry = zin.getNextEntry()) != null) {
                 String name = entry.getName();
+
                 // Skip signature files in META-INF (.SF, .RSA, .DSA)
-                if (name.startsWith("META-INF/") && (name.endsWith(".SF") || name.endsWith(".RSA") || name.endsWith(".DSA"))) {
+                if (name.startsWith("META-INF/")
+                        && (name.endsWith(".SF") || name.endsWith(".RSA") || name.endsWith(".DSA"))) {
                     continue;
                 }
+
                 // Skip the fabric.mod.json ONLY if this is the fabric-loader jar
-                // This prevents the "Mods share ID"
+                // This prevents the "Mods share ID" conflict
                 if (jarFile.getName().contains("fabric-loader") && name.equals("fabric.mod.json")) {
-                    System.out.println("SSFML: Stripping fabric.mod.json from " + jarFile.getName() + " to prevent conflict.");
+                    System.out.println("SSFML: Stripping fabric.mod.json from "
+                            + jarFile.getName() + " to prevent conflict.");
                     continue;
                 }
+
                 zout.putNextEntry(new ZipEntry(name));
+
                 byte[] buffer = new byte[4096];
                 int len;
                 while ((len = zin.read(buffer)) > 0) {
                     zout.write(buffer, 0, len);
                 }
+
                 zout.closeEntry();
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("SSFML: Failed to strip signatures from "
+                    + jarFile.getName() + ": " + e.getMessage());
+
+            if (tempFile.exists() && !tempFile.delete()) {
+                System.err.println("SSFML: Could not remove temporary file: "
+                        + tempFile.getAbsolutePath());
+            }
+
+            return;
         }
 
-        // Replace the original JAR with the unsigned one
-        jarFile.delete();
-        tempFile.renameTo(jarFile);
+        // Replace the original JAR with the unsigned one.
+        try {
+            Files.move(
+                    tempFile.toPath(),
+                    jarFile.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
+            );
+
+            System.out.println("SSFML: Stripped signatures from " + jarFile.getName());
+        } catch (IOException e) {
+            System.err.println("SSFML: Could not replace " + jarFile.getName()
+                    + " with the stripped JAR: " + e.getMessage());
+
+            if (tempFile.exists() && !tempFile.delete()) {
+                System.err.println("SSFML: Could not remove temporary file: "
+                        + tempFile.getAbsolutePath());
+            }
+        }
     }
 
     /**
@@ -382,7 +420,17 @@ public class KnotLauncher {
      */
     private static void unpackInternalLibs(File gameJar, File outputDir) {
         // 1. Ensure the libs folder actually exists first
-        if (!outputDir.exists()) outputDir.mkdirs();
+        if (!outputDir.exists() && !outputDir.mkdirs()) {
+            System.err.println("SSFML: Could not create libraries directory: "
+                    + outputDir.getAbsolutePath());
+            return;
+        }
+
+        if (!outputDir.isDirectory()) {
+            System.err.println("SSFML: Library output path is not a directory: "
+                    + outputDir.getAbsolutePath());
+            return;
+        }
 
         try (ZipInputStream zin = new ZipInputStream(new FileInputStream(gameJar))) {
             ZipEntry entry;
