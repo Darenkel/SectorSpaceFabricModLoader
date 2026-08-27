@@ -21,3 +21,6 @@ mods/
 natives/
 other-test-files/
 reference-only/
+
+# Ignore Sector Space, user must put there own here.
+app/libs/Sector Space.jar
