@@ -13,3 +13,11 @@ bin/
 .idea/
 *.class
 *.log
+
+# Local test files
+saves/
+resources/
+mods/
+natives/
+other-test-files/
+reference-only/
