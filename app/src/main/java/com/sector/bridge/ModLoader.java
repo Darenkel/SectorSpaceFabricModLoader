@@ -7,7 +7,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -17,7 +16,7 @@ import java.util.Map;
  * This owns the mods/mod_list.cfg and enforces its true/false state directly on the files in mods/
  * <p>
  * Fabric's DirectoryModCandidateFinder only accepts files whose name ends in ".jar".
- * As put in net.fabricmc.loader.impl.discovery.DirectoryModCandidateFinder#isValidFile)
+ * As put in net.fabricmc.loader.impl.discovery.DirectoryModCandidateFinder#isValidFile
  * So this is my current workaround:
  *  - enabled ("true")  -> file ends in ".jar" (Fabric loads it)
  *  - disabled ("false")-> file ends in ".jar.disabled" (Fabric ignores it)

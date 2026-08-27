@@ -11,11 +11,11 @@ import javax.swing.JLabel;
 
 /**
  * Small Swing setup dialog used to select the game folder and verify the installed game.
- *
+ * <p>
  * It reads:
  * - Sector Space.jar
  * - settings.ini
- *
+ * <p>
  * and stores the validated game path and version in LocVerifierCFG.
  */
 public class LocVerifierApp {
@@ -115,7 +115,7 @@ public class LocVerifierApp {
 
     /**
      * Parses the client version from settings.ini.
-     *
+     * <p>
      * Expected format:
      *   client version=0.5.9.4
      */
