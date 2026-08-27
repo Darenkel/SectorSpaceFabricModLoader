@@ -94,7 +94,8 @@ public class KnotLauncher {
             pb.inheritIO();
 
             System.out.println("SSFML: Launching Fabric with enabled mods in: " + modsFolder.getAbsolutePath());
-            pb.start();
+            Process gameProcess = pb.start();
+            System.out.println("SSFML: Game process started (PID " + gameProcess.pid() + ").");
             System.exit(0);
 
         } catch (Exception e) {
@@ -166,6 +167,7 @@ public class KnotLauncher {
 
                     if (isValidJar(target)) {
                         obtained = true;
+                        System.out.println("SSFML: " + libName + " extracted from resources successfully.");
                     } else {
                         System.err.println("SSFML: Extracted " + libName + " is invalid or corrupt.");
 
@@ -215,6 +217,8 @@ public class KnotLauncher {
 
         if (!failedLibs.isEmpty()) {
             writeLibErrorReport(gameFolder, failedLibs);
+        } else {
+            System.out.println("SSFML: All required libraries verified.");
         }
     }
 
