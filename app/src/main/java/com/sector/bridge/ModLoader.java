@@ -30,7 +30,7 @@ public class ModLoader {
     private static final String DISABLED_SUFFIX = ".disabled";
 
     /**
-     * This syncs the mod_list.cfg against what is current in mods/, then renames each jar on disk to match the set state.
+     * Syncs mod_list.cfg against what is current in mods/, then renames each jar on disk to match the set state.
      * This is called once per launch, before Fabric/Knot starts.
      * Fabric will then scan and loads mods/ once this returns.
      */
@@ -42,6 +42,8 @@ public class ModLoader {
             Files.createDirectories(modsDir);
 
             Map<String, Boolean> existing = readConfig(configPath);
+
+            resolveDuplicates(modsDir, existing);
 
             // Canonical name on-disk and whether it's currently enabled or disabled.
             Map<String, File> currentFiles = getStringFileMap(modsDir);
@@ -73,6 +75,52 @@ public class ModLoader {
 
         } catch (IOException e) {
             System.err.println("SSFML: failed applying mod state: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Finds any canonical mod name that currently exists as BOTH "Example.jar" and "Example.jar.disabled"
+     * and deletes whichever copy does NOT match that mod's current cfg state (defaulting to disabled if the mod isn't in the cfg yet).
+     * Logs every resolution so a duplicate just in case.
+     */
+    private void resolveDuplicates(Path modsDir, Map<String, Boolean> existing) throws IOException {
+        File[] all = modsDir.toFile().listFiles();
+        if (all == null) {
+            return;
+        }
+
+        Map<String, File> enabledCopies = new LinkedHashMap<>();
+        Map<String, File> disabledCopies = new LinkedHashMap<>();
+
+        for (File f : all) {
+            if (!f.isFile()) continue;
+            String name = f.getName();
+            String lower = name.toLowerCase(Locale.ROOT);
+            if (lower.endsWith(".jar")) {
+                enabledCopies.put(name, f);
+            } else if (lower.endsWith(".jar" + DISABLED_SUFFIX)) {
+                String canonical = name.substring(0, name.length() - DISABLED_SUFFIX.length());
+                disabledCopies.put(canonical, f);
+            }
+        }
+
+        for (String canonicalName : disabledCopies.keySet()) {
+            if (!enabledCopies.containsKey(canonicalName)) {
+                continue; // no duplicate -- nothing to resolve
+            }
+
+            boolean shouldBeEnabled = existing.getOrDefault(canonicalName, false);
+            File enabledFile = enabledCopies.get(canonicalName);
+            File disabledFile = disabledCopies.get(canonicalName);
+
+            File loser = shouldBeEnabled ? disabledFile : enabledFile;
+            String loserPath = loser.getAbsolutePath();
+
+            if (Files.deleteIfExists(loser.toPath())) {
+                System.out.println("SSFML: found both an enabled and disabled copy of " + canonicalName
+                        + " -- kept the " + (shouldBeEnabled ? "enabled" : "disabled")
+                        + " one per mod_list.cfg and deleted " + loserPath);
+            }
         }
     }
 
