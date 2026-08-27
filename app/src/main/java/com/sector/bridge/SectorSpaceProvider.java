@@ -14,6 +14,8 @@ import net.fabricmc.loader.impl.util.Arguments;
 public class SectorSpaceProvider implements GameProvider {
     private Arguments arguments;
     private Path gameJarPath;
+    private GameTransformer entrypointTransformer;
+    private FabricLauncher cachedLauncher;
 
     public void preVerify() {
         // Check if either vital piece of info is missing
@@ -27,6 +29,7 @@ public class SectorSpaceProvider implements GameProvider {
 
     @Override
     public void initialize(net.fabricmc.loader.impl.launch.FabricLauncher launcher) {
+        this.cachedLauncher = launcher;
         this.arguments = new Arguments();
 
         if (this.gameJarPath != null) {
@@ -150,7 +153,15 @@ public class SectorSpaceProvider implements GameProvider {
     public String[] getLaunchArguments(boolean server) { return this.arguments.toArray(); }
 
     @Override
-    public GameTransformer getEntrypointTransformer() { return new GameTransformer(); }
+    public GameTransformer getEntrypointTransformer() {
+        if (this.entrypointTransformer == null) {
+            this.entrypointTransformer = new GameTransformer();
+            if (this.gameJarPath != null && this.cachedLauncher != null) {
+                this.entrypointTransformer.locateEntrypoints(this.cachedLauncher, java.util.List.of(this.gameJarPath));
+            }
+        }
+        return this.entrypointTransformer;
+    }
 
     @Override
     public Set<BuiltinTransform> getBuiltinTransforms(String gameId) { return Collections.emptySet(); }
