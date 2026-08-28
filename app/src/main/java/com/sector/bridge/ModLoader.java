@@ -122,6 +122,23 @@ public class ModLoader {
             }
         }
 
+        // Same idea, but for disabled mods, lets the fallback case below tell the difference
+        // between "not installed at all" and "installed but currently disabled."
+        Map<String, String[]> disabledModsById = new LinkedHashMap<>(); // id -> {canonicalName, version}
+        for (Map.Entry<String, Boolean> entry : rebuilt.entrySet()) {
+            if (entry.getValue()) {
+                continue;
+            }
+            File modFile = currentFiles.get(entry.getKey());
+            if (modFile == null) {
+                continue;
+            }
+            String[] idAndVersion = readModIdAndVersion(modFile);
+            if (idAndVersion != null) {
+                disabledModsById.put(idAndVersion[0], new String[] { entry.getKey(), idAndVersion[1] });
+            }
+        }
+
         for (Map.Entry<String, Boolean> entry : rebuilt.entrySet()) {
             if (!entry.getValue()) {
                 continue;
@@ -157,8 +174,25 @@ public class ModLoader {
                     default:
                         actualVersion = enabledModVersions.get(depId);
                         if (actualVersion == null) {
-                            System.out.println("SSFML: " + canonicalName + " requires " + depId + " " + requiredRange
-                                    + " but no enabled mod with that id was found.");
+                            String[] disabled = disabledModsById.get(depId);
+                            if (disabled != null) {
+                                String disabledCanonicalName = disabled[0];
+                                String disabledVersion = disabled[1];
+                                Boolean wouldSatisfy = versionSatisfies(disabledVersion, requiredRange);
+
+                                String suffix = Boolean.TRUE.equals(wouldSatisfy)
+                                        ? " Its version (" + disabledVersion + ") would satisfy this requirement."
+                                        : Boolean.FALSE.equals(wouldSatisfy)
+                                        ? " Its version (" + disabledVersion + ") would NOT satisfy this requirement even if re-enabled."
+                                        : "";
+
+                                System.out.println("SSFML: " + canonicalName + " requires " + depId + " " + requiredRange
+                                        + " - found as " + disabledCanonicalName + " but it is currently disabled."
+                                        + " Consider re-enabling it." + suffix);
+                            } else {
+                                System.out.println("SSFML: " + canonicalName + " requires " + depId + " " + requiredRange
+                                        + " but no enabled or disabled mod with that id was found.");
+                            }
                             continue;
                         }
                 }
@@ -172,7 +206,7 @@ public class ModLoader {
                             + " - satisfied by " + actualVersion + ".");
                 } else {
                     System.out.println("SSFML: " + canonicalName + " requires " + depId + " " + requiredRange
-                            + " but found " + actualVersion + " - may not be compatible. Not disabling automatically.");
+                            + " but found " + actualVersion + " - may not be compatible. This mod will not be disabled automatically.");
                 }
             }
         }
