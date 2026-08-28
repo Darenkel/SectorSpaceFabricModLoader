@@ -4,6 +4,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 import net.fabricmc.loader.impl.game.GameProvider;
@@ -141,7 +142,32 @@ public class SectorSpaceProvider implements GameProvider {
     public String getRawGameVersion() { return LocVerifierCFG.getProperty("game_version"); }
 
     @Override
-    public String getNormalizedGameVersion() { return LocVerifierCFG.getProperty("game_version"); }
+    public String getNormalizedGameVersion() {
+        String raw = LocVerifierCFG.getProperty("game_version");
+        if (raw == null) {
+            return "0.0.0";
+        }
+
+        String trimmed = raw.trim();
+
+        // Strip a leading "v"/"V" (e.g. "v0.5.9.6" -> "0.5.9.6") and drop anything that
+        // isn't valid in a Fabric consumable version string (digits, dots, hyphen, plus).
+        if (trimmed.regionMatches(true, 0, "v", 0, 1)) {
+            trimmed = trimmed.substring(1);
+        }
+        String cleaned = trimmed.replaceAll("[^0-9A-Za-z.\\-+]", "");
+
+        if (cleaned.isEmpty()) {
+            System.err.println("Bridge: game_version \"" + raw + "\" had no usable characters after cleanup, defaulting to 0.0.0.");
+            return "0.0.0";
+        }
+
+        // Note: Sector Space's current version scheme has 4 numeric components (e.g. "0.5.9.6")
+        // Fabric Loader will still accept this as a valid Version string,
+        // it just won't support semver-range dependency comparisons against it.
+        // Revisit this later if the version format ever changes shape.
+        return cleaned;
+    }
 
     @Override
     public boolean isEnabled() { return true; }
@@ -174,18 +200,37 @@ public class SectorSpaceProvider implements GameProvider {
         return true;
     }
 
+    /**
+     * Allows for sector space dependency in fabric.mod.json
+     * "depends": {
+     *     "fabricloader": ">=0.18.4",
+     *     "java": ">=25",
+     *     "sector-space": ">=0.5.9.6"
+     * }
+     */
     @Override
     public Collection<BuiltinMod> getBuiltinMods() {
         String loaderVersion = net.fabricmc.loader.impl.FabricLoaderImpl.VERSION;
-        // This registers the running loader as a dependency satisfy-er
-        return Collections.singletonList(
-                new BuiltinMod(
-                        Collections.emptyList(), // Optional path
-                        new BuiltinModMetadata.Builder("fabricloader", loaderVersion)
-                                .setName("Fabric Loader")
-                                .build()
-                )
-        );
+
+        List<BuiltinMod> mods = new java.util.ArrayList<>();
+
+        mods.add(new BuiltinMod(
+                Collections.emptyList(),
+                new BuiltinModMetadata.Builder("fabricloader", loaderVersion)
+                        .setName("Fabric Loader")
+                        .build()
+        ));
+
+        // Registers the game itself as a dependency-satisfying mod, so a fabric.mod.json
+        // can declare a "sector-space" version requirement in its "depends" block.
+        mods.add(new BuiltinMod(
+                Collections.emptyList(),
+                new BuiltinModMetadata.Builder(getGameId(), getNormalizedGameVersion())
+                        .setName(getGameName())
+                        .build()
+        ));
+
+        return mods;
     }
 
     @Override
