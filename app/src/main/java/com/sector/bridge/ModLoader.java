@@ -56,7 +56,7 @@ public class ModLoader {
     /**
      * User exits the window., while not a crash this should log it just in case.
      */
-    static final class LaunchAbortedException extends Exception {
+    public static final class LaunchAbortedException extends Exception {
         LaunchAbortedException(String message) {
             super(message);
         }
@@ -215,21 +215,12 @@ public class ModLoader {
             for (Map.Entry<String, String> dep : depends.entrySet()) {
                 String depId = dep.getKey();
                 String requiredRange = dep.getValue();
-                String actualVersion;
-
-                switch (depId) {
-                    case "sector-space":
-                        actualVersion = currentGameVersion;
-                        break;
-                    case "fabricloader":
-                        actualVersion = fabricLoaderVersion;
-                        break;
-                    case "java":
-                        actualVersion = javaVersion;
-                        break;
-                    default:
-                        actualVersion = enabledModVersions.get(depId);
-                }
+                String actualVersion = switch (depId) {
+                    case "sector-space" -> currentGameVersion;
+                    case "fabricloader" -> fabricLoaderVersion;
+                    case "java" -> javaVersion;
+                    default -> enabledModVersions.get(depId);
+                };
 
                 if (actualVersion == null) {
                     String[] disabled = disabledModsById.get(depId);
@@ -298,7 +289,12 @@ public class ModLoader {
         JScrollPane scrollPane = new JScrollPane(textArea);
         scrollPane.setPreferredSize(new Dimension(520, 300));
 
-        JDialog dialog = new JDialog((Frame) null, "SSFML - Mod Dependency Issues", true);
+        javax.swing.JFrame dummy = new javax.swing.JFrame("SSFML - Mod Dependency Issue");
+        dummy.setUndecorated(true);
+        dummy.setVisible(true);
+        dummy.setLocationRelativeTo(null);
+
+        JDialog dialog = new JDialog(dummy, "SSFML - Mod Dependency Issues", true);
         dialog.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
 
         final DependencyDialogChoice[] choice = { null };
@@ -347,6 +343,8 @@ public class ModLoader {
         dialog.pack();
         dialog.setLocationRelativeTo(null);
         dialog.setVisible(true); // Blocks here until one of the four buttons disposes it.
+
+        dummy.dispose();
 
         if (exitRequested[0] || choice[0] == null) {
             throw new LaunchAbortedException("User chose to exit due to mod dependency issues.");
