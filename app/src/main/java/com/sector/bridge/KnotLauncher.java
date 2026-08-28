@@ -225,7 +225,7 @@ public class KnotLauncher {
     /**
      * Checks whether a file is a valid JAR.
      */
-    private static boolean isValidJar(File file) {
+    static boolean isValidJar(File file) {
         if (!file.exists() || !file.isFile() || file.length() == 0) {
             return false;
         }

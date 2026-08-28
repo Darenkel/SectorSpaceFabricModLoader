@@ -48,7 +48,14 @@ public class SectorSpaceProvider implements GameProvider {
                         // Extract JARs and DLLs
                         if (name.endsWith(".jar") || name.endsWith(".dll")) {
                             java.nio.file.Path target = extractPath.resolve(name);
-                            if (!java.nio.file.Files.exists(target)) {
+                            boolean needsExtraction = name.endsWith(".jar")
+                                    ? !KnotLauncher.isValidJar(target.toFile())
+                                    : !java.nio.file.Files.exists(target);
+
+                            if (needsExtraction) {
+                                if (java.nio.file.Files.exists(target)) {
+                                    java.nio.file.Files.delete(target);
+                                }
                                 java.nio.file.Files.copy(zip.getInputStream(entry), target);
                             }
 
@@ -68,6 +75,7 @@ public class SectorSpaceProvider implements GameProvider {
                 System.out.println("Bridge: Extracted and injected nested dependencies.");
 
             } catch (java.io.IOException e) {
+                System.err.println("Bridge: Failed to extract nested dependencies: " + e);
                 e.printStackTrace();
             }
 
@@ -180,9 +188,12 @@ public class SectorSpaceProvider implements GameProvider {
             Path libsDir = this.gameJarPath.getParent().resolve("libs");
             if (java.nio.file.Files.exists(libsDir)) {
                 try (var stream = java.nio.file.Files.list(libsDir)) {
-                    stream.filter(p -> p.toString().endsWith(".jar"))
-                            .forEach(launcher::addToClassPath);
+                    long added = stream.filter(p -> p.toString().endsWith(".jar"))
+                            .peek(launcher::addToClassPath)
+                            .count();
+                    System.out.println("Bridge: Added " + added + " lib jar(s) from " + libsDir + " to the classpath.");
                 } catch (java.io.IOException e) {
+                    System.err.println("Bridge: Failed to list libs directory: " + libsDir.toAbsolutePath() + ": " + e);
                     e.printStackTrace();
                 }
             }
