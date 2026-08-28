@@ -1,5 +1,6 @@
 package com.sector.bridge;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
@@ -16,6 +17,8 @@ public class SectorSpaceProvider implements GameProvider {
     private Path gameJarPath;
     private GameTransformer entrypointTransformer;
     private FabricLauncher cachedLauncher;
+    private static final String SOURCE_MARKER_FILE = ".source_marker";
+
 
     public void preVerify() {
         // Check if either vital piece of info is missing
@@ -33,14 +36,24 @@ public class SectorSpaceProvider implements GameProvider {
         this.arguments = new Arguments();
 
         if (this.gameJarPath != null) {
-            // 1. Create a temporary folder to hold extracted files
-            java.nio.file.Path extractPath = this.gameJarPath.getParent().resolve("bridge_temp");
+            java.nio.file.Path extractPath = this.gameJarPath.getParent().resolve("extracted_dependencies ");
 
             try {
-                // Remove files left behind by a previous run.
-                deleteTempDirectory(extractPath);
-
                 java.nio.file.Files.createDirectories(extractPath);
+
+                String currentMarker = buildSourceMarker(this.gameJarPath.toFile());
+                java.nio.file.Path markerPath = extractPath.resolve(SOURCE_MARKER_FILE);
+                String previousMarker = java.nio.file.Files.exists(markerPath)
+                        ? java.nio.file.Files.readString(markerPath).trim()
+                        : null;
+
+                if (!currentMarker.equals(previousMarker)) {
+                    if (previousMarker != null) {
+                        System.out.println("Bridge: Game jar has changed since last extraction, refreshing extracted_dependencies...");
+                    }
+                    deleteTempDirectory(extractPath);
+                    java.nio.file.Files.createDirectories(extractPath);
+                }
 
                 // 2. Open the Game JAR and extract EVERYTHING needed
                 try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(this.gameJarPath.toFile())) {
@@ -73,20 +86,13 @@ public class SectorSpaceProvider implements GameProvider {
                     }
                 }
 
-                // 4. Set the Natives Path to our temp folder
+                // Record what we extracted from, so the next launch can tell if it's stale.
+                java.nio.file.Files.writeString(markerPath, currentMarker);
+
+                // 4. Set the Natives Path to our extracted_dependencies folder
                 String p = extractPath.toAbsolutePath().toString();
                 System.setProperty("org.lwjgl.librarypath", p);
                 System.setProperty("java.library.path", p);
-
-                // Attempt to remove extracted dependencies when the game exits.
-                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                    try {
-                        deleteTempDirectory(extractPath);
-                        System.out.println("Bridge: Cleaned up temporary dependencies.");
-                    } catch (java.io.IOException e) {
-                        System.err.println("Bridge: Failed to clean up temporary dependencies: " + e.getMessage());
-                    }
-                }, "Bridge-Temp-Cleanup"));
 
                 System.out.println("Bridge: Extracted and injected nested dependencies.");
 
@@ -96,6 +102,29 @@ public class SectorSpaceProvider implements GameProvider {
             }
 
             Thread.currentThread().setContextClassLoader(launcher.getTargetClassLoader());
+        }
+    }
+
+    private static String buildSourceMarker(File gameJar) throws java.io.IOException {
+        java.nio.file.attribute.FileTime lastModified = java.nio.file.Files.getLastModifiedTime(gameJar.toPath());
+        long size = java.nio.file.Files.size(gameJar.toPath());
+        return lastModified.toMillis() + ":" + size;
+    }
+
+    private static void deleteTempDirectory(java.nio.file.Path directory) throws java.io.IOException {
+        if (!java.nio.file.Files.exists(directory)) {
+            return;
+        }
+
+        try (java.util.stream.Stream<java.nio.file.Path> paths = java.nio.file.Files.walk(directory)) {
+            paths.sorted(java.util.Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            java.nio.file.Files.deleteIfExists(path);
+                        } catch (java.io.IOException e) {
+                            System.err.println("Bridge: Failed to delete " + path + ": " + e.getMessage());
+                        }
+                    });
         }
     }
 
@@ -216,20 +245,4 @@ public class SectorSpaceProvider implements GameProvider {
         }
     }
 
-    private static void deleteTempDirectory(java.nio.file.Path directory) throws java.io.IOException {
-        if (!java.nio.file.Files.exists(directory)) {
-            return;
-        }
-
-        try (java.util.stream.Stream<java.nio.file.Path> paths = java.nio.file.Files.walk(directory)) {
-            paths.sorted(java.util.Comparator.reverseOrder())
-                    .forEach(path -> {
-                        try {
-                            java.nio.file.Files.deleteIfExists(path);
-                        } catch (java.io.IOException e) {
-                            System.err.println("Bridge: Failed to delete " + path + ": " + e.getMessage());
-                        }
-                    });
-        }
-    }
 }
