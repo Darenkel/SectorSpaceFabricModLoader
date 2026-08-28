@@ -22,9 +22,9 @@ public class LocVerifierCFG {
         props.setProperty("game_version", gameVersion);
         try (OutputStream out = new FileOutputStream(CONFIG_FILE)) {
             props.store(out, "Fabric Bridge Configuration");
-            System.out.println("LocV: Saved configuration to " + CONFIG_FILE + ".");
+            System.out.println("LocVCFG: Saved configuration to " + CONFIG_FILE + ".");
         } catch (IOException e) {
-            System.err.println("LocV: Failed to save configuration to " + CONFIG_FILE + ": " + e);
+            System.err.println("LocVCFG: Failed to save configuration to " + CONFIG_FILE + ": " + e);
             e.printStackTrace();
         }
     }
@@ -42,7 +42,7 @@ public class LocVerifierCFG {
             try (InputStream in = new FileInputStream(file)) {
                 props.load(in);
             } catch (IOException e) {
-                System.err.println("LocV: Failed to load configuration from " + CONFIG_FILE + ": " + e);
+                System.err.println("LocVCFG: Failed to load configuration from " + CONFIG_FILE + ": " + e);
                 e.printStackTrace();
             }
         }
