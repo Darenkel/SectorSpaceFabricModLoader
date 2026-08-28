@@ -48,6 +48,41 @@ The built jar is written to `app/build/libs/`.
 3. Every mod is **disabled (false) by default**. Edit `mod_list.cfg` and set the mods you want to `true`.
 4. Restart the game to apply mods. Only mods marked `true` will load. `mod_list.cfg` is re-synced against the `mods/` folder on every launch, new jars appear as `false`, and jars you remove disappear from the list automatically.
 
+### Mod dependencies
+
+SSFML reads each enabled mod's `fabric.mod.json` and does a best-effort check of its `depends` block before launch, logging whether each requirement looks satisfied. This is informational only, it never disables a mod or blocks launch on its own.
+
+Four kinds of dependencies are recognized:
+- `sector-space` - checked against the currently verified game version
+- `fabricloader` - checked against the running Fabric Loader version
+- `java` - checked against the current JRE version
+- any other mod's own `id` - checked against that mod's `id`/`version` if it's also enabled in `mods/`
+
+Example `fabric.mod.json`:
+```json
+{
+  "schemaVersion": 1,
+  "id": "offlcersam_modtest",
+  "version": "1.0.0",
+  "name": "WeaponTest",
+  "description": "Sector Space test mod.",
+  "environment": "*",
+
+  "mixins": [
+    "modtest.mixins.json"
+  ],
+
+  "depends": {
+    "fabricloader": ">=0.18.4",
+    "java": ">=25",
+    "sector-space": ">=0.5.9.6",
+    "offlcersam_modexamplelib": ">=1.0.0"
+  }
+}
+```
+
+Results are printed to the console and `SSFML_startup_log.txt` on every launch, including a log message if a dependency is found but currently disabled versus not being installed at all.
+
 ## Logs
 
 If something goes wrong, check `SSFML_startup_log.txt` in your game folder, it mirrors everything printed to the console to a plain text file.
