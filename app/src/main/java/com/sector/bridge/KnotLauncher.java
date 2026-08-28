@@ -136,6 +136,7 @@ public class KnotLauncher {
             return;
         }
 
+        sweepStaleDownloads(libsDir);
         unpackInternalLibs(gameJar, libsDir);
 
         String[] requiredLibs = {
@@ -231,6 +232,30 @@ public class KnotLauncher {
             writeLibErrorReport(gameFolder, failedLibs);
         } else {
             System.out.println("SSFML: All required libraries verified.");
+        }
+    }
+
+    /**
+     * Removes any leftover .download temp files from a previous run that got killed
+     * mid-download, so they don't just sit in libs/ indefinitely.
+     */
+    private static void sweepStaleDownloads(File libsDir) {
+        File[] staleDownloads = libsDir.listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".download"));
+        if (staleDownloads == null || staleDownloads.length == 0) {
+            return;
+        }
+
+        int removed = 0;
+        for (File stale : staleDownloads) {
+            if (stale.delete()) {
+                removed++;
+            } else {
+                System.err.println("SSFML: Could not remove stale download artifact: " + stale.getAbsolutePath());
+            }
+        }
+
+        if (removed > 0) {
+            System.out.println("SSFML: Swept " + removed + " leftover .download file(s) from a previous interrupted run.");
         }
     }
 
