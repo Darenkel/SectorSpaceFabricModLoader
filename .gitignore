@@ -12,4 +12,5 @@ bin/
 .vscode/
 *.class
 *.log
-*.jar
+app/libs/Sector Space.jar
+
