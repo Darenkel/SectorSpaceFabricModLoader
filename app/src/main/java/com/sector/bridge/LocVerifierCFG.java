@@ -17,19 +17,14 @@ public class LocVerifierCFG {
     }
 
     // Call this in your UI when verification is successful
-    public static void saveSettings(String game_path, String game_version) {
-        // 1. Force initialization if props is somehow null
-        if (props == null) {
-            // Since props is 'final', you'll need to remove 'final' from 
-            // its declaration at the top for this specific check to work, 
-            // OR just ensure it's not null here.
-            System.err.println("Props was null! Re-initializing...");
-        }
-        props.setProperty("game_path", game_path);
-        props.setProperty("game_version", game_version);
+    public static void saveSettings(String gamePath, String gameVersion) {
+        props.setProperty("game_path", gamePath);
+        props.setProperty("game_version", gameVersion);
         try (OutputStream out = new FileOutputStream(CONFIG_FILE)) {
             props.store(out, "Fabric Bridge Configuration");
+            System.out.println("LocV: Saved configuration to " + CONFIG_FILE + ".");
         } catch (IOException e) {
+            System.err.println("LocV: Failed to save configuration to " + CONFIG_FILE + ": " + e);
             e.printStackTrace();
         }
     }
@@ -47,6 +42,7 @@ public class LocVerifierCFG {
             try (InputStream in = new FileInputStream(file)) {
                 props.load(in);
             } catch (IOException e) {
+                System.err.println("LocV: Failed to load configuration from " + CONFIG_FILE + ": " + e);
                 e.printStackTrace();
             }
         }

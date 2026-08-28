@@ -22,7 +22,7 @@ public class LocVerifierApp {
         public static void main(String[] args) {
             
             // Creates a hidden frame to act as the owner
-            JFrame dummy = new JFrame();
+            JFrame dummy = new JFrame("SSFML Bridge Setup");
             dummy.setUndecorated(true);
             dummy.setVisible(true);
             dummy.setLocationRelativeTo(null);
@@ -54,7 +54,7 @@ public class LocVerifierApp {
             });
 
             JButton selectButton = new JButton("Select & Verify Game Folder");
-            
+
             selectButton.addActionListener(e -> {
 
                 // 1. Check if we are already verified
@@ -66,41 +66,48 @@ public class LocVerifierApp {
                 frame.setAlwaysOnTop(false);
                 chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY); // Select folder, not file
                 int result = chooser.showOpenDialog(frame); // This creates the 'result' variable
-                if (selectButton.getText().equals("Continue to Game")) {
-                        frame.dispose(); 
-                        return;
-                    }
+
                 if (result == JFileChooser.APPROVE_OPTION) {
                     File selectedFolder = chooser.getSelectedFile(); // This is the root folder
-    
+
                     // Define the two files we need to find inside that folder
                     File jarFile = new File(selectedFolder, "Sector Space.jar");
                     File iniFile = new File(selectedFolder, "settings.ini");
 
                     // 1. Verify BOTH files exist
                     if (jarFile.exists() && iniFile.exists()) {
-        
-                   // 2. Call your version check on the INI file
-                        String version = getGameVersion(iniFile); 
+
+                        // 2. Call your version check on the INI file
+                        String version = getGameVersion(iniFile);
 
                         if (version != null) {
-                        // 3. Save the data: Use the JAR path and the parsed version
-                        LocVerifierCFG.saveSettings(jarFile.getAbsolutePath(), version);
+                            // 3. Save the data: Use the JAR path and the parsed version
+                            LocVerifierCFG.saveSettings(jarFile.getAbsolutePath(), version);
+                            System.out.println("LocVApp: Verified game at " + selectedFolder.getAbsolutePath()
+                                    + " (version " + version + ").");
 
-                       // 4. Update the UI Labels
-                        versionLabel.setText("Client Version: " + version + " (Verified)");
-                        versionLabel.setForeground(new java.awt.Color(0, 150, 0));
+                            // 4. Update the UI Labels
+                            versionLabel.setText("Client Version: " + version + " (Verified)");
+                            versionLabel.setForeground(new java.awt.Color(0, 150, 0));
 
-                        // 5. Change the Button to "Continue"
-                        selectButton.setText("Continue to Game");
+                            // 5. Change the Button to "Continue"
+                            selectButton.setText("Continue to Game");
+                        } else {
+                            System.err.println("LocVApp: Found settings.ini in " + selectedFolder.getAbsolutePath()
+                                    + " but could not read a client version from it.");
+                            javax.swing.JOptionPane.showMessageDialog(frame,
+                                    "Found settings.ini but couldn't read a client version from it!",
+                                    "Verification Failed", javax.swing.JOptionPane.ERROR_MESSAGE);
                         }
                     } else {
                         // Error handling for missing files
-                        javax.swing.JOptionPane.showMessageDialog(frame, 
-                    "Missing 'Sector Space.jar' or 'settings.ini' in this folder!", 
-                    "Verification Failed", javax.swing.JOptionPane.ERROR_MESSAGE);
+                        System.err.println("LocVApp: Missing 'Sector Space.jar' or 'settings.ini' in "
+                                + selectedFolder.getAbsolutePath());
+                        javax.swing.JOptionPane.showMessageDialog(frame,
+                                "Missing 'Sector Space.jar' or 'settings.ini' in this folder!",
+                                "Verification Failed", javax.swing.JOptionPane.ERROR_MESSAGE);
                     }
-            }
+                }
             });
             frame.add(versionLabel);
             frame.add(selectButton);
@@ -110,7 +117,7 @@ public class LocVerifierApp {
             frame.toFront();
             frame.requestFocus();
             frame.setVisible(true);
-            System.out.println("Window should be visible now");
+            System.out.println("LocVApp: Setup UI displayed.");
         };
 
     /**
@@ -134,7 +141,7 @@ public class LocVerifierApp {
                 }
             }
         } catch (java.io.IOException e) {
-            System.err.println("Error reading settings.ini: " + e.getMessage());
+            System.err.println("LocVApp: Error reading settings.ini: " + e.getMessage());
         }
         return null; // Returns null if the line is never found
     }
