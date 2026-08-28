@@ -366,6 +366,11 @@ public class KnotLauncher {
      * Removes signature metadata from a JAR if it causes conflict with Fabric.
      */
     private static void stripSignatures(File jarFile) {
+        if (!needsStripping(jarFile)) {
+            System.out.println("SSFML: " + jarFile.getName() + " has nothing to strip, skipping.");
+            return;
+        }
+
         File tempFile = new File(jarFile.getAbsolutePath() + ".tmp");
 
         try (ZipInputStream zin = new ZipInputStream(new FileInputStream(jarFile));
@@ -429,6 +434,34 @@ public class KnotLauncher {
                         + tempFile.getAbsolutePath());
             }
         }
+    }
+
+    /**
+     * Checks whether a jar actually has anything for stripSignatures() to remove,
+     * so a normal launch doesn't rewrite jars that don't need it.
+     */
+    private static boolean needsStripping(File jarFile) {
+        boolean isFabricLoader = jarFile.getName().contains("fabric-loader");
+
+        try (ZipInputStream zin = new ZipInputStream(new FileInputStream(jarFile))) {
+            ZipEntry entry;
+            while ((entry = zin.getNextEntry()) != null) {
+                String name = entry.getName();
+
+                if (name.startsWith("META-INF/")
+                        && (name.endsWith(".SF") || name.endsWith(".RSA") || name.endsWith(".DSA"))) {
+                    return true;
+                }
+
+                if (isFabricLoader && name.equals("fabric.mod.json")) {
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
