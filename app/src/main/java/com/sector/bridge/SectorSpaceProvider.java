@@ -35,7 +35,11 @@ public class SectorSpaceProvider implements GameProvider {
         if (this.gameJarPath != null) {
             // 1. Create a temporary folder to hold extracted files
             java.nio.file.Path extractPath = this.gameJarPath.getParent().resolve("bridge_temp");
+
             try {
+                // Remove files left behind by a previous run.
+                deleteTempDirectory(extractPath);
+
                 java.nio.file.Files.createDirectories(extractPath);
 
                 // 2. Open the Game JAR and extract EVERYTHING needed
@@ -56,7 +60,9 @@ public class SectorSpaceProvider implements GameProvider {
                                 if (java.nio.file.Files.exists(target)) {
                                     java.nio.file.Files.delete(target);
                                 }
-                                java.nio.file.Files.copy(zip.getInputStream(entry), target);
+                                try (java.io.InputStream input = zip.getInputStream(entry)) {
+                                    java.nio.file.Files.copy(input, target);
+                                }
                             }
 
                             // 3. If it's a JAR, add it to Fabric's ClassPath
@@ -71,6 +77,16 @@ public class SectorSpaceProvider implements GameProvider {
                 String p = extractPath.toAbsolutePath().toString();
                 System.setProperty("org.lwjgl.librarypath", p);
                 System.setProperty("java.library.path", p);
+
+                // Attempt to remove extracted dependencies when the game exits.
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    try {
+                        deleteTempDirectory(extractPath);
+                        System.out.println("Bridge: Cleaned up temporary dependencies.");
+                    } catch (java.io.IOException e) {
+                        System.err.println("Bridge: Failed to clean up temporary dependencies: " + e.getMessage());
+                    }
+                }, "Bridge-Temp-Cleanup"));
 
                 System.out.println("Bridge: Extracted and injected nested dependencies.");
 
@@ -197,6 +213,23 @@ public class SectorSpaceProvider implements GameProvider {
                     e.printStackTrace();
                 }
             }
+        }
+    }
+
+    private static void deleteTempDirectory(java.nio.file.Path directory) throws java.io.IOException {
+        if (!java.nio.file.Files.exists(directory)) {
+            return;
+        }
+
+        try (java.util.stream.Stream<java.nio.file.Path> paths = java.nio.file.Files.walk(directory)) {
+            paths.sorted(java.util.Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            java.nio.file.Files.deleteIfExists(path);
+                        } catch (java.io.IOException e) {
+                            System.err.println("Bridge: Failed to delete " + path + ": " + e.getMessage());
+                        }
+                    });
         }
     }
 }
