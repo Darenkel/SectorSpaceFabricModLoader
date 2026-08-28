@@ -110,6 +110,8 @@ public class KnotLauncher {
             System.out.println("SSFML: Game process started (PID " + gameProcess.pid() + ").");
             System.exit(0);
 
+        } catch (ModLoader.LaunchAbortedException e) {
+            System.out.println("SSFML: " + e.getMessage() + " Not launching the game.");
         } catch (Exception e) {
             System.err.println("SSFML: Failed to launch game process: " + e);
             e.printStackTrace();

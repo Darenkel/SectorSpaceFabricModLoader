@@ -13,7 +13,7 @@ import java.time.format.DateTimeFormatter;
  */
 public final class StartupLogger {
 
-    private static final String LOG_FILE_NAME = "SSFML_startup_log.txt";
+    static final String LOG_FILE_NAME = "SSFML_startup_log.txt";
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private StartupLogger() {

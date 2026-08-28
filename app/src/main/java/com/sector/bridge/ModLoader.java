@@ -1,5 +1,10 @@
 package com.sector.bridge;
 
+import java.awt.BorderLayout;
+import java.awt.Desktop;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Frame;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -9,13 +14,20 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import javax.swing.JButton;
+import javax.swing.JDialog;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
 
 /**
  * This owns the mods/mod_list.cfg and enforces its true/false state directly on the files in mods/
@@ -42,11 +54,38 @@ public class ModLoader {
     private static final Pattern VERSION_PATTERN = Pattern.compile("\"version\"\\s*:\\s*\"([^\"]+)\"");
 
     /**
+     * User exits the window., while not a crash this should log it just in case.
+     */
+    static final class LaunchAbortedException extends Exception {
+        LaunchAbortedException(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * Result of a "Continue to Game" vs "Continue to Game and Disable Problem Mods" choice on the dependency-issue dialog.
+     */
+    private enum DependencyDialogChoice {
+        CONTINUE,
+        CONTINUE_AND_DISABLE
+    }
+
+    /**
+     * Holds what logGameVersionCompatibility() found: every check gets logged as it happens,
+     * but this is what applyModState() actually needs afterward to decide whether to show the dependency dialog
+     * and, if so, which mods it would offer to disable.
+     */
+    private static final class DependencyCheckResult {
+        final List<String> problemDescriptions = new ArrayList<>();
+        final Set<String> problemMods = new LinkedHashSet<>();
+    }
+
+    /**
      * Syncs mod_list.cfg against what is current in mods/, then renames each jar on disk to match the set state.
      * This is called once per launch, before Fabric/Knot starts.
      * Fabric will then scan and loads mods/ once this returns.
      */
-    public void applyModState(File gameDir) {
+    public void applyModState(File gameDir) throws LaunchAbortedException {
         Path modsDir = gameDir.toPath().resolve("mods");
         Path configPath = modsDir.resolve("mod_list.cfg");
 
@@ -65,9 +104,24 @@ public class ModLoader {
                 rebuilt.put(canonicalName, existing.getOrDefault(canonicalName, false));
             }
 
-            writeConfig(configPath, rebuilt);
+            DependencyCheckResult depResult = logGameVersionCompatibility(currentFiles, rebuilt);
 
-            logGameVersionCompatibility(currentFiles, rebuilt);
+            // If any enabled mod has a dependency issue that would likely crash Fabric, ask the user how to proceed instead of letting it crash first.
+            // writeConfig() is called after this, not before, so a "disable" choice here actually persists to mod_list.cfg
+            // instead of only applying for this one launch.
+            if (!depResult.problemMods.isEmpty()) {
+                DependencyDialogChoice choice = showDependencyDialog(gameDir, depResult.problemDescriptions);
+                if (choice == DependencyDialogChoice.CONTINUE_AND_DISABLE) {
+                    for (String canonicalName : depResult.problemMods) {
+                        rebuilt.put(canonicalName, false);
+                        System.out.println("SSFML: Disabling " + canonicalName + " per user choice due to dependency issues.");
+                    }
+                } else {
+                    System.out.println("SSFML: Continuing with problem mods still enabled per user choice - launch may crash.");
+                }
+            }
+
+            writeConfig(configPath, rebuilt);
 
             for (Map.Entry<String, Boolean> entry : rebuilt.entrySet()) {
                 String canonicalName = entry.getKey();
@@ -97,10 +151,12 @@ public class ModLoader {
     /**
      * Information scan for each currently enabled mod, check if it declares any "depends" entries against
      * sector-space, fabricloader, java, and any other enabled mod's own id/version then log whether its requirement is satisfied or not.
-     * Does not disable a mod or block launch, up to user to figure out the problem.
+     * Hands back mods that have a definite, unmet requirement so applyModState() can offer the user a choice via dependency dialog.
      * This runs before Fabric itself starts, so it cannot actually see Fabric's own dependency thing.
      */
-    private void logGameVersionCompatibility(Map<String, File> currentFiles, Map<String, Boolean> rebuilt) {
+    private DependencyCheckResult logGameVersionCompatibility(Map<String, File> currentFiles, Map<String, Boolean> rebuilt) {
+        DependencyCheckResult result = new DependencyCheckResult();
+
         String currentGameVersion = LocVerifierCFG.getNormalizedGameVersion();
         String fabricLoaderVersion = net.fabricmc.loader.impl.FabricLoaderImpl.VERSION;
         String javaVersion = System.getProperty("java.version");
@@ -173,28 +229,32 @@ public class ModLoader {
                         break;
                     default:
                         actualVersion = enabledModVersions.get(depId);
-                        if (actualVersion == null) {
-                            String[] disabled = disabledModsById.get(depId);
-                            if (disabled != null) {
-                                String disabledCanonicalName = disabled[0];
-                                String disabledVersion = disabled[1];
-                                Boolean wouldSatisfy = versionSatisfies(disabledVersion, requiredRange);
+                }
 
-                                String suffix = Boolean.TRUE.equals(wouldSatisfy)
-                                        ? " Its version (" + disabledVersion + ") would satisfy this requirement."
-                                        : Boolean.FALSE.equals(wouldSatisfy)
-                                        ? " Its version (" + disabledVersion + ") would NOT satisfy this requirement even if re-enabled."
-                                        : "";
+                if (actualVersion == null) {
+                    String[] disabled = disabledModsById.get(depId);
+                    String reason;
+                    if (disabled != null) {
+                        String disabledCanonicalName = disabled[0];
+                        String disabledVersion = disabled[1];
+                        Boolean wouldSatisfy = versionSatisfies(disabledVersion, requiredRange);
 
-                                System.out.println("SSFML: " + canonicalName + " requires " + depId + " " + requiredRange
-                                        + " - found as " + disabledCanonicalName + " but it is currently disabled."
-                                        + " Consider re-enabling it." + suffix);
-                            } else {
-                                System.out.println("SSFML: " + canonicalName + " requires " + depId + " " + requiredRange
-                                        + " but no enabled or disabled mod with that id was found.");
-                            }
-                            continue;
-                        }
+                        String suffix = Boolean.TRUE.equals(wouldSatisfy)
+                                ? " Its version (" + disabledVersion + ") would satisfy this requirement."
+                                : Boolean.FALSE.equals(wouldSatisfy)
+                                ? " Its version (" + disabledVersion + ") would NOT satisfy this requirement even if re-enabled."
+                                : "";
+
+                        reason = "requires " + depId + " " + requiredRange + " - found as " + disabledCanonicalName
+                                + " but it is currently disabled. Consider re-enabling it." + suffix;
+                    } else {
+                        reason = "requires " + depId + " " + requiredRange + " but no enabled or disabled mod with that id was found.";
+                    }
+
+                    System.out.println("SSFML: " + canonicalName + " " + reason);
+                    result.problemMods.add(canonicalName);
+                    result.problemDescriptions.add(canonicalName + " " + reason);
+                    continue;
                 }
 
                 Boolean satisfied = versionSatisfies(actualVersion, requiredRange);
@@ -205,11 +265,94 @@ public class ModLoader {
                     System.out.println("SSFML: " + canonicalName + " requires " + depId + " " + requiredRange
                             + " - satisfied by " + actualVersion + ".");
                 } else {
-                    System.out.println("SSFML: " + canonicalName + " requires " + depId + " " + requiredRange
-                            + " but found " + actualVersion + " - may not be compatible. This mod will not be disabled automatically.");
+                    String reason = "requires " + depId + " " + requiredRange + " but found " + actualVersion + ".";
+                    System.out.println("SSFML: " + canonicalName + " " + reason);
+                    result.problemMods.add(canonicalName);
+                    result.problemDescriptions.add(canonicalName + " " + reason);
                 }
             }
         }
+
+        return result;
+    }
+
+    /**
+     * Shows a modal dialog listing every unmet dependency found by logGameVersionCompatibility(),
+     * with four choices: continue as-is, continue and disable the problem mods, open the startup log, or exit without launching.
+     * "Open Logs" doesn't close the dialog, of course.
+     * Closing the window via the OS close button is treated the same as "Exit".
+     */
+    private DependencyDialogChoice showDependencyDialog(File gameDir, List<String> problemDescriptions) throws LaunchAbortedException {
+        StringBuilder text = new StringBuilder();
+        text.append("The following mod dependency issues were found:\n\n");
+        for (String line : problemDescriptions) {
+            text.append("- ").append(line).append("\n");
+        }
+        text.append("\nContinuing without addressing these may cause the game to crash on launch.");
+
+        JTextArea textArea = new JTextArea(text.toString());
+        textArea.setEditable(false);
+        textArea.setLineWrap(true);
+        textArea.setWrapStyleWord(true);
+        textArea.setCaretPosition(0);
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        scrollPane.setPreferredSize(new Dimension(520, 300));
+
+        JDialog dialog = new JDialog((Frame) null, "SSFML - Mod Dependency Issues", true);
+        dialog.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+
+        final DependencyDialogChoice[] choice = { null };
+        final boolean[] exitRequested = { false };
+
+        JButton continueButton = new JButton("Continue to Game");
+        JButton continueDisableButton = new JButton("Continue to Game and Disable Problem Mods");
+        JButton openLogsButton = new JButton("Open Logs");
+        JButton exitButton = new JButton("Exit");
+
+        continueButton.addActionListener(e -> {
+            choice[0] = DependencyDialogChoice.CONTINUE;
+            dialog.dispose();
+        });
+        continueDisableButton.addActionListener(e -> {
+            choice[0] = DependencyDialogChoice.CONTINUE_AND_DISABLE;
+            dialog.dispose();
+        });
+        openLogsButton.addActionListener(e -> {
+            File logFile = new File(gameDir, StartupLogger.LOG_FILE_NAME);
+            try {
+                if (Desktop.isDesktopSupported() && logFile.exists()) {
+                    Desktop.getDesktop().open(logFile);
+                } else {
+                    System.err.println("SSFML: Could not open log file (unsupported or missing): " + logFile.getAbsolutePath());
+                }
+            } catch (IOException ex) {
+                System.err.println("SSFML: Failed to open log file: " + ex.getMessage());
+            }
+            // Dialog stays open - Open Logs isn't a final choice, just a side action.
+        });
+        exitButton.addActionListener(e -> {
+            exitRequested[0] = true;
+            dialog.dispose();
+        });
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 8));
+        buttonPanel.add(continueButton);
+        buttonPanel.add(continueDisableButton);
+        buttonPanel.add(openLogsButton);
+        buttonPanel.add(exitButton);
+
+        dialog.getContentPane().setLayout(new BorderLayout());
+        dialog.getContentPane().add(scrollPane, BorderLayout.CENTER);
+        dialog.getContentPane().add(buttonPanel, BorderLayout.SOUTH);
+        dialog.pack();
+        dialog.setLocationRelativeTo(null);
+        dialog.setVisible(true); // Blocks here until one of the four buttons disposes it.
+
+        if (exitRequested[0] || choice[0] == null) {
+            throw new LaunchAbortedException("User chose to exit due to mod dependency issues.");
+        }
+
+        return choice[0];
     }
 
     /**
