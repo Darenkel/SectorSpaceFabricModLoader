@@ -36,7 +36,7 @@ public class ModLoader {
     private static final String CONFIG_HEADER = "# Auto-generated mod list, start game to update.\n# Otherwise, add in per-line format: ExJar.jar, true/false.\n";
     private static final String DISABLED_SUFFIX = ".disabled";
 
-    private static final Pattern DEPENDS_BLOCK_PATTERN = Pattern.compile("\"depends\"\\s*:\\s*\\{([^}]*)\\}", Pattern.DOTALL);
+    private static final Pattern DEPENDS_BLOCK_PATTERN = Pattern.compile("\"depends\"\\s*:\\s*\\{([^}]*)}", Pattern.DOTALL);
     private static final Pattern DEPENDS_ENTRY_PATTERN = Pattern.compile("\"([^\"]+)\"\\s*:\\s*\"([^\"]+)\"");
     private static final Pattern ID_PATTERN = Pattern.compile("\"id\"\\s*:\\s*\"([^\"]+)\"");
     private static final Pattern VERSION_PATTERN = Pattern.compile("\"version\"\\s*:\\s*\"([^\"]+)\"");
