@@ -161,13 +161,13 @@ public class LocVerifierApp {
 
         String version = getGameVersion(iniFile);
         if (version == null) {
-            System.err.println("SSFML: Found Sector Space.jar and settings.ini in "
+            System.err.println("LocVApp: Found Sector Space.jar and settings.ini in "
                     + folder.getAbsolutePath() + " but could not read a client version from it.");
             return false;
         }
 
         LocVerifierCFG.saveSettings(jarFile.getAbsolutePath(), version);
-        System.out.println("SSFML: Auto-detected game at " + folder.getAbsolutePath()
+        System.out.println("LocVApp: Auto-detected game at " + folder.getAbsolutePath()
                 + " (version " + version + ").");
         return true;
     }
