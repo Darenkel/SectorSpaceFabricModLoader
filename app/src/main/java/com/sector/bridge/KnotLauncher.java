@@ -35,13 +35,19 @@ public class KnotLauncher {
         StartupLogger.install(logTargetFolder);
 
         if (savedPath == null || !new File(savedPath).exists()) {
-            System.out.println("SSFML: Game not found. Opening Setup UI...");
-            LocVerifierApp.main(new String[0]);
+            File bridgeFolder = new File(bridgeJarPath).getParentFile();
 
-            savedPath = LocVerifierCFG.getProperty("game_path");
-            if (savedPath == null || !new File(savedPath).exists()) {
-                System.out.println("SSFML: Setup was not completed. Exiting.");
-                return;
+            if (LocVerifierApp.tryAutoDetect(bridgeFolder)) {
+                savedPath = LocVerifierCFG.getProperty("game_path");
+            } else {
+                System.out.println("SSFML: Game not found. Opening Setup UI...");
+                LocVerifierApp.main(new String[0]);
+
+                savedPath = LocVerifierCFG.getProperty("game_path");
+                if (savedPath == null || !new File(savedPath).exists()) {
+                    System.out.println("SSFML: Setup was not completed. Exiting.");
+                    return;
+                }
             }
         }
 

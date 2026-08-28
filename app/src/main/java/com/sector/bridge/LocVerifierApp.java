@@ -145,4 +145,30 @@ public class LocVerifierApp {
         }
         return null; // Returns null if the line is never found
     }
+
+    /**
+     * Attempts to verify Sector Space.jar and settings.ini directly in the given folder
+     * without showing the setup UI. Returns true and saves the config if both files are
+     * found and a version can be parsed, returns false otherwise.
+     */
+    public static boolean tryAutoDetect(File folder) {
+        File jarFile = new File(folder, "Sector Space.jar");
+        File iniFile = new File(folder, "settings.ini");
+
+        if (!jarFile.exists() || !iniFile.exists()) {
+            return false;
+        }
+
+        String version = getGameVersion(iniFile);
+        if (version == null) {
+            System.err.println("SSFML: Found Sector Space.jar and settings.ini in "
+                    + folder.getAbsolutePath() + " but could not read a client version from it.");
+            return false;
+        }
+
+        LocVerifierCFG.saveSettings(jarFile.getAbsolutePath(), version);
+        System.out.println("SSFML: Auto-detected game at " + folder.getAbsolutePath()
+                + " (version " + version + ").");
+        return true;
+    }
 }
