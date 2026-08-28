@@ -4,7 +4,6 @@ import java.awt.BorderLayout;
 import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Frame;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
