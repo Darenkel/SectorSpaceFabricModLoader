@@ -2,6 +2,7 @@ package com.sector.bridge;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,6 +12,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /**
  * This owns the mods/mod_list.cfg and enforces its true/false state directly on the files in mods/
@@ -30,6 +35,11 @@ public class ModLoader {
 
     private static final String CONFIG_HEADER = "# Auto-generated mod list, start game to update.\n# Otherwise, add in per-line format: ExJar.jar, true/false.\n";
     private static final String DISABLED_SUFFIX = ".disabled";
+
+    private static final Pattern DEPENDS_BLOCK_PATTERN = Pattern.compile("\"depends\"\\s*:\\s*\\{([^}]*)\\}", Pattern.DOTALL);
+    private static final Pattern DEPENDS_ENTRY_PATTERN = Pattern.compile("\"([^\"]+)\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern ID_PATTERN = Pattern.compile("\"id\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern VERSION_PATTERN = Pattern.compile("\"version\"\\s*:\\s*\"([^\"]+)\"");
 
     /**
      * Syncs mod_list.cfg against what is current in mods/, then renames each jar on disk to match the set state.
@@ -57,6 +67,8 @@ public class ModLoader {
 
             writeConfig(configPath, rebuilt);
 
+            logGameVersionCompatibility(currentFiles, rebuilt);
+
             for (Map.Entry<String, Boolean> entry : rebuilt.entrySet()) {
                 String canonicalName = entry.getKey();
                 boolean enabled = entry.getValue();
@@ -80,6 +92,225 @@ public class ModLoader {
         } catch (IOException e) {
             System.err.println("SSFML: Failed applying mod state: " + e.getMessage());
         }
+    }
+
+    /**
+     * Information scan for each currently enabled mod, check if it declares any "depends" entries against
+     * sector-space, fabricloader, java, and any other enabled mod's own id/version then log whether its requirement is satisfied or not.
+     * Does not disable a mod or block launch, up to user to figure out the problem.
+     * This runs before Fabric itself starts, so it cannot actually see Fabric's own dependency thing.
+     */
+    private void logGameVersionCompatibility(Map<String, File> currentFiles, Map<String, Boolean> rebuilt) {
+        String currentGameVersion = LocVerifierCFG.getNormalizedGameVersion();
+        String fabricLoaderVersion = net.fabricmc.loader.impl.FabricLoaderImpl.VERSION;
+        String javaVersion = System.getProperty("java.version");
+
+        // Build modId -> version for every currently-enabled mod, so mod-to-mod
+        // dependencies can be checked the same way the special-cased ones are.
+        Map<String, String> enabledModVersions = new LinkedHashMap<>();
+        for (Map.Entry<String, Boolean> entry : rebuilt.entrySet()) {
+            if (!entry.getValue()) {
+                continue;
+            }
+            File modFile = currentFiles.get(entry.getKey());
+            if (modFile == null) {
+                continue;
+            }
+            String[] idAndVersion = readModIdAndVersion(modFile);
+            if (idAndVersion != null) {
+                enabledModVersions.put(idAndVersion[0], idAndVersion[1]);
+            }
+        }
+
+        for (Map.Entry<String, Boolean> entry : rebuilt.entrySet()) {
+            if (!entry.getValue()) {
+                continue;
+            }
+
+            String canonicalName = entry.getKey();
+            File modFile = currentFiles.get(canonicalName);
+            if (modFile == null) {
+                continue;
+            }
+
+            Map<String, String> depends = readDependsBlock(modFile);
+            if (depends.isEmpty()) {
+                System.out.println("SSFML: " + canonicalName + " declares no dependencies to check.");
+                continue;
+            }
+
+            for (Map.Entry<String, String> dep : depends.entrySet()) {
+                String depId = dep.getKey();
+                String requiredRange = dep.getValue();
+                String actualVersion;
+
+                switch (depId) {
+                    case "sector-space":
+                        actualVersion = currentGameVersion;
+                        break;
+                    case "fabricloader":
+                        actualVersion = fabricLoaderVersion;
+                        break;
+                    case "java":
+                        actualVersion = javaVersion;
+                        break;
+                    default:
+                        actualVersion = enabledModVersions.get(depId);
+                        if (actualVersion == null) {
+                            System.out.println("SSFML: " + canonicalName + " requires " + depId + " " + requiredRange
+                                    + " but no enabled mod with that id was found.");
+                            continue;
+                        }
+                }
+
+                Boolean satisfied = versionSatisfies(actualVersion, requiredRange);
+                if (satisfied == null) {
+                    System.out.println("SSFML: " + canonicalName + " requires " + depId + " " + requiredRange
+                            + " - could not evaluate against version " + actualVersion + ".");
+                } else if (satisfied) {
+                    System.out.println("SSFML: " + canonicalName + " requires " + depId + " " + requiredRange
+                            + " - satisfied by " + actualVersion + ".");
+                } else {
+                    System.out.println("SSFML: " + canonicalName + " requires " + depId + " " + requiredRange
+                            + " but found " + actualVersion + " - may not be compatible. Not disabling automatically.");
+                }
+            }
+        }
+    }
+
+    /**
+     * Reads a mod jar's own "id" and "version" out of its fabric.mod.json, if present.
+     * Returns null if either field is missing or the jar has no fabric.mod.json.
+     */
+    private static String[] readModIdAndVersion(File modFile) {
+        String json = readFabricModJson(modFile);
+        if (json == null) {
+            return null;
+        }
+
+        Matcher idMatcher = ID_PATTERN.matcher(json);
+        Matcher versionMatcher = VERSION_PATTERN.matcher(json);
+        if (!idMatcher.find() || !versionMatcher.find()) {
+            return null;
+        }
+
+        return new String[] { idMatcher.group(1), versionMatcher.group(1) };
+    }
+
+    /**
+     * Extracts every key/value pair inside a mod jar's "depends" block. Regex-scoped to just
+     * the "depends" block's braces first, so entries under "recommends"/"conflicts"/etc. aren't picked up by mistake.
+     */
+    private static Map<String, String> readDependsBlock(File modFile) {
+        Map<String, String> result = new LinkedHashMap<>();
+        String json = readFabricModJson(modFile);
+        if (json == null) {
+            return result;
+        }
+
+        Matcher blockMatcher = DEPENDS_BLOCK_PATTERN.matcher(json);
+        if (!blockMatcher.find()) {
+            return result;
+        }
+
+        Matcher entryMatcher = DEPENDS_ENTRY_PATTERN.matcher(blockMatcher.group(1));
+        while (entryMatcher.find()) {
+            result.put(entryMatcher.group(1), entryMatcher.group(2));
+        }
+        return result;
+    }
+
+    /**
+     * Reads the raw text of fabric.mod.json out of a mod jar, or null if it's missing or unreadable.
+     */
+    private static String readFabricModJson(File modFile) {
+        try (ZipFile zip = new ZipFile(modFile)) {
+            ZipEntry entry = zip.getEntry("fabric.mod.json");
+            if (entry == null) {
+                return null;
+            }
+            try (InputStream in = zip.getInputStream(entry)) {
+                return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        } catch (IOException e) {
+            System.err.println("SSFML: Could not read fabric.mod.json from " + modFile.getName() + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Evaluation attempt of a fabric-style version against version string.
+     * Returns null if any clause can't be parsed, so caller logs remain unknown instead of a false true/false.
+     * This is sort of a standalone reimplementation of Fabric's semver-superset comparison rule.
+     * This exits because Fabric's own VersionPredicate class isn't reliably on the class path at this point.
+     */
+    private static Boolean versionSatisfies(String actualVersion, String predicateExpr) {
+        for (String clause : predicateExpr.trim().split("\\s+")) {
+            Boolean result = evaluateSingleClause(actualVersion, clause);
+            if (result == null || !result) {
+                return result;
+            }
+        }
+        return true;
+    }
+
+    private static Boolean evaluateSingleClause(String actualVersion, String clause) {
+        if (clause.equals("*")) {
+            return true;
+        }
+
+        String operator;
+        String versionPart;
+
+        if (clause.startsWith(">=") || clause.startsWith("<=")) {
+            operator = clause.substring(0, 2);
+            versionPart = clause.substring(2);
+        } else if (clause.startsWith(">") || clause.startsWith("<") || clause.startsWith("=")) {
+            operator = clause.substring(0, 1);
+            versionPart = clause.substring(1);
+        } else {
+            operator = "=";
+            versionPart = clause;
+        }
+
+        int cmp;
+        try {
+            cmp = compareVersions(actualVersion, versionPart);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+
+        return switch (operator) {
+            case ">=" -> cmp >= 0;
+            case "<=" -> cmp <= 0;
+            case ">" -> cmp > 0;
+            case "<" -> cmp < 0;
+            case "=" -> cmp == 0;
+            default -> null;
+        };
+    }
+
+    /**
+     * Compares two dot-separated numeric version strings component by component,
+     * left to right, treating missing components as 0, matching Fabric's documented semver-superset comparison rule.
+     * Ignores any "-prerelease" or "+build" suffix on either side, if present.
+     */
+    private static int compareVersions(String a, String b) {
+        String coreA = a.split("[-+]", 2)[0];
+        String coreB = b.split("[-+]", 2)[0];
+
+        String[] partsA = coreA.split("\\.");
+        String[] partsB = coreB.split("\\.");
+        int length = Math.max(partsA.length, partsB.length);
+
+        for (int i = 0; i < length; i++) {
+            int valueA = i < partsA.length ? Integer.parseInt(partsA[i]) : 0;
+            int valueB = i < partsB.length ? Integer.parseInt(partsB[i]) : 0;
+            if (valueA != valueB) {
+                return Integer.compare(valueA, valueB);
+            }
+        }
+        return 0;
     }
 
     /**
