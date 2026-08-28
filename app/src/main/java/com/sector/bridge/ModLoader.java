@@ -444,7 +444,7 @@ public class ModLoader {
         }
 
         for (String raw : Files.readAllLines(configPath, StandardCharsets.UTF_8)) {
-            String line = raw == null ? "" : raw.trim();
+            String line = raw.trim();
             if (line.isEmpty() || line.startsWith("#")) {
                 continue;
             }
