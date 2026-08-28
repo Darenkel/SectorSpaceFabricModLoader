@@ -36,7 +36,7 @@ public class SectorSpaceProvider implements GameProvider {
         this.arguments = new Arguments();
 
         if (this.gameJarPath != null) {
-            java.nio.file.Path extractPath = this.gameJarPath.getParent().resolve("extracted_dependencies ");
+            java.nio.file.Path extractPath = this.gameJarPath.getParent().resolve("extracted_dependencies");
 
             try {
                 java.nio.file.Files.createDirectories(extractPath);
