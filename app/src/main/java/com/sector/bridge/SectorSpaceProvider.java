@@ -240,21 +240,6 @@ public class SectorSpaceProvider implements GameProvider {
         if (jarPath != null) {
             launcher.addToClassPath(Path.of(jarPath));
         }
-
-        if (this.gameJarPath != null) {
-            Path libsDir = this.gameJarPath.getParent().resolve("libs");
-            if (java.nio.file.Files.exists(libsDir)) {
-                try (var stream = java.nio.file.Files.list(libsDir)) {
-                    long added = stream.filter(p -> p.toString().endsWith(".jar"))
-                            .peek(launcher::addToClassPath)
-                            .count();
-                    System.out.println("Bridge: Added " + added + " lib jar(s) from " + libsDir + " to the classpath.");
-                } catch (java.io.IOException e) {
-                    System.err.println("Bridge: Failed to list libs directory: " + libsDir.toAbsolutePath() + ": " + e);
-                    e.printStackTrace();
-                }
-            }
-        }
     }
 
 }
