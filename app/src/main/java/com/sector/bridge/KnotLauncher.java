@@ -102,6 +102,9 @@ public class KnotLauncher {
             pbCommand.add("-Djava.library.path=" + new File(gameFolder, "natives").getAbsolutePath());
             pbCommand.add("-Dfabric.gameJarPath=" + gameJarPath);
             pbCommand.add("-Dfabric.modsFolder=" + modsFolder.getAbsolutePath());
+            // Just in case
+            pbCommand.add("--enable-native-access=ALL-UNNAMED");
+            pbCommand.add("--sun-misc-unsafe-memory-access=allow");
             pbCommand.add("-cp");
             pbCommand.add(finalCp);
             pbCommand.add("net.fabricmc.loader.impl.launch.knot.KnotClient");
