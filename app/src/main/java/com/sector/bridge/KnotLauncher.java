@@ -35,13 +35,14 @@ public class KnotLauncher {
             bridgeJarPath = new File(KnotLauncher.class.getProtectionDomain().getCodeSource().getLocation().getPath()).getAbsolutePath();
         }
 
+        File bridgeFolder = new File(bridgeJarPath).getParentFile();
+
         // Mirror all SSFML console output to SSFML_startup_log.txt.
-        File logTargetFolder = (savedPath != null) ? new File(savedPath).getParentFile() : new File(System.getProperty("user.dir"));
+        // Falls back to the bridge jar's own folder.
+        File logTargetFolder = (savedPath != null) ? new File(savedPath).getParentFile() : bridgeFolder;
         StartupLogger.install(logTargetFolder);
 
         if (savedPath == null || !new File(savedPath).exists()) {
-            File bridgeFolder = new File(bridgeJarPath).getParentFile();
-
             if (LocVerifierApp.tryAutoDetect(bridgeFolder)) {
                 savedPath = LocVerifierCFG.getProperty("game_path");
             } else {
