@@ -154,12 +154,17 @@ public class KnotLauncher {
      * Best-effort classification of a single line forwarded from the game process. Since redirectErrorStream(true) merges stdout/stderr before this ever sees it,
      * there's no stream-based signal left to judge severity from, only the text itself.
      * <p>
-     * Two things it recognizes:
+     * In priority order:
      * - Fabric Loader's own bracketed level tag ("[09:24:44] [WARN] [FabricLoader/Mixin]: Text"),
-     *   which is trusted directly since Fabric already knows the real severity of its own lines.
-     * - The game engine's raw, untagged crash output (stack trace frames, "Caused by:", "* Error:",
-     *   the JVM's own "WARNING:" native-access notices, or the word "Exception" anywhere in the
-     *   line), none of which carries any bracketed level at all on its own.
+     *   trusted directly since Fabric already knows the real severity of its own lines.
+     * - The game engine's own "* Error:"/"Caused by:" prefixes and raw stack trace frames ("at text").
+     * - A line explicitly labeled "Warning:" by the engine itself, or "WARNING:" by the JVM's own
+     *   native-access notices - checked BEFORE the broader Exception/Error substring fallback below,
+     *   so a line like "Warning: Failed to verify ... FileNotFoundException" is trusted as the WARN
+     *   it's explicitly labeled as, not bumped to ERROR just because it happens to mention an
+     *   exception type in passing.
+     * - Anything else containing the word "Exception" or "Error" as a last-resort fallback, for
+     *   crash text that isn't explicitly prefixed at all (e.g. a bare stack trace's first line).
      * <p>
      * This is a heuristic, a line that happens to contain the word "Exception" or "Error" in an otherwise benign context
      * would still get classified as ERROR. Given the alternative is everything defaulting to INFO, false positives here are the 'safer'' failure mode.
@@ -174,14 +179,16 @@ public class KnotLauncher {
 
         if (trimmed.startsWith("* Error:")
                 || trimmed.startsWith("Caused by:")
-                || trimmed.startsWith("at ")
-                || trimmed.contains("Exception")
-                || trimmed.contains("Error")) {
+                || trimmed.startsWith("at ")) {
             return "ERROR";
         }
 
-        if (trimmed.startsWith("WARNING:")) {
+        if (trimmed.regionMatches(true, 0, "warning:", 0, "warning:".length())) {
             return "WARN";
+        }
+
+        if (trimmed.contains("Exception") || trimmed.contains("Error")) {
+            return "ERROR";
         }
 
         return "INFO";
