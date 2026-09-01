@@ -84,7 +84,7 @@ public class ModLoader {
      * but this is what applyModState() actually needs afterward to decide whether to show the dependency dialog and,
      * if so, which mods it would offer to disable, and what it would offer to write into fabric_loader_dependencies.json instead.
      */
-    private static final class DependencyCheckResult {
+    static final class DependencyCheckResult {
         final List<String> problemDescriptions = new ArrayList<>();
         final Set<String> problemMods = new LinkedHashSet<>();
         final List<ProblemDependency> problemDependencies = new ArrayList<>();
@@ -212,6 +212,8 @@ public class ModLoader {
                 disabledModsById.put(idAndVersion[0], new String[] { entry.getKey(), idAndVersion[1] });
             }
         }
+
+        detectDuplicateModIds(currentFiles, canonicalNameToId, result);
 
         for (Map.Entry<String, Boolean> entry : rebuilt.entrySet()) {
             if (!entry.getValue()) {
@@ -356,6 +358,67 @@ public class ModLoader {
         }
 
         return result;
+    }
+
+    /**
+     * Detects multiple currently-enabled mods sharing the same fabric.mod.json "id".
+     * Unlike an unmet "depends" entry, there's no fabric_loader_dependencies.json override for two mods claiming the same id.
+     * Fabric's own resolver treats it as a hard failure. So these get logged and added to problemMods (for the dialog's "disable" choice)
+     * but deliberately never to problemDependencies, there's nothing to write an override for here, only disabling actually fixes it.
+     * <p>
+     * When a group is found, whichever copy has the highest version is treated as the one to keep.
+     * Every other copy in the group is flagged. Ties, or a version that doesn't parse as comparable,
+     * just keep whichever copy was encountered first and flag the rest; this is a simple default,
+     * not a guarantee that the "kept" copy is actually the one the user wanted.
+     */
+    void detectDuplicateModIds(Map<String, File> currentFiles, Map<String, String> canonicalNameToId, DependencyCheckResult result) {
+        Map<String, List<String>> canonicalNamesById = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : canonicalNameToId.entrySet()) {
+            canonicalNamesById.computeIfAbsent(entry.getValue(), k -> new ArrayList<>()).add(entry.getKey());
+        }
+
+        for (Map.Entry<String, List<String>> group : canonicalNamesById.entrySet()) {
+            List<String> canonicalNames = group.getValue();
+            if (canonicalNames.size() < 2) {
+                continue;
+            }
+
+            String modId = group.getKey();
+            String keeper = canonicalNames.get(0);
+            String keeperVersion = versionOf(currentFiles.get(keeper));
+
+            for (String candidate : canonicalNames.subList(1, canonicalNames.size())) {
+                String candidateVersion = versionOf(currentFiles.get(candidate));
+                try {
+                    if (compareVersions(candidateVersion, keeperVersion) > 0) {
+                        keeper = candidate;
+                        keeperVersion = candidateVersion;
+                    }
+                } catch (NumberFormatException e) {
+                    // Can't compare - keep whichever was already chosen.
+                }
+            }
+
+            System.out.println("SSFML: Duplicate mod id \"" + modId + "\" - " + canonicalNames.size()
+                    + " enabled copies found. Fabric will not resolve this on its own.");
+
+            for (String canonicalName : canonicalNames) {
+                boolean isKeeper = canonicalName.equals(keeper);
+                System.out.println("SSFML:   - " + canonicalName + " (" + versionOf(currentFiles.get(canonicalName)) + ")"
+                        + (isKeeper ? " - would keep this one (highest version)" : " - would disable this one"));
+
+                if (!isKeeper) {
+                    String reason = "shares mod id \"" + modId + "\" with " + keeper + ", both enabled.";
+                    result.problemMods.add(canonicalName);
+                    result.problemDescriptions.add(canonicalName + " " + reason);
+                }
+            }
+        }
+    }
+
+    private static String versionOf(File modFile) {
+        String[] idAndVersion = readModIdAndVersion(modFile);
+        return idAndVersion != null ? idAndVersion[1] : "0";
     }
 
     /**
@@ -572,7 +635,7 @@ public class ModLoader {
      * This is sort of a standalone reimplementation of Fabric's semver-superset comparison rule.
      * This exits because Fabric's own VersionPredicate class isn't reliably on the class path at this point.
      */
-    private static Boolean versionSatisfies(String actualVersion, String predicateExpr) {
+    static Boolean versionSatisfies(String actualVersion, String predicateExpr) {
         for (String clause : predicateExpr.trim().split("\\s+")) {
             Boolean result = evaluateSingleClause(actualVersion, clause);
             if (result == null || !result) {
@@ -582,7 +645,7 @@ public class ModLoader {
         return true;
     }
 
-    private static Boolean evaluateSingleClause(String actualVersion, String clause) {
+    static Boolean evaluateSingleClause(String actualVersion, String clause) {
         if (clause.equals("*")) {
             return true;
         }
@@ -623,7 +686,7 @@ public class ModLoader {
      * left to right, treating missing components as 0, matching Fabric's documented semver-superset comparison rule.
      * Ignores any "-prerelease" or "+build" suffix on either side, if present.
      */
-    private static int compareVersions(String a, String b) {
+    static int compareVersions(String a, String b) {
         String coreA = a.split("[-+]", 2)[0];
         String coreB = b.split("[-+]", 2)[0];
 
@@ -671,7 +734,7 @@ public class ModLoader {
      * and deletes whichever copy does NOT match that mod's current cfg state (defaulting to disabled if the mod isn't in the cfg yet).
      * Logs every resolution so a duplicate just in case.
      */
-    private void resolveDuplicates(Path modsDir, Map<String, Boolean> existing) throws IOException {
+    void resolveDuplicates(Path modsDir, Map<String, Boolean> existing) throws IOException {
         File[] all = modsDir.toFile().listFiles();
         if (all == null) {
             return;
@@ -712,7 +775,7 @@ public class ModLoader {
         }
     }
 
-    private Map<String, File> getStringFileMap(Path modsDir) {
+    Map<String, File> getStringFileMap(Path modsDir) {
         Map<String, File> currentFiles = new LinkedHashMap<>();
         File[] all = modsDir.toFile().listFiles();
         if (all != null) {
@@ -731,7 +794,7 @@ public class ModLoader {
         return currentFiles;
     }
 
-    private Map<String, Boolean> readConfig(Path configPath) throws IOException {
+    Map<String, Boolean> readConfig(Path configPath) throws IOException {
         Map<String, Boolean> result = new LinkedHashMap<>();
         if (!Files.exists(configPath)) {
             return result;
@@ -759,7 +822,7 @@ public class ModLoader {
         return result;
     }
 
-    private void writeConfig(Path configPath, Map<String, Boolean> entries) throws IOException {
+    void writeConfig(Path configPath, Map<String, Boolean> entries) throws IOException {
         StringBuilder sb = new StringBuilder(CONFIG_HEADER);
         for (Map.Entry<String, Boolean> entry : entries.entrySet()) {
             sb.append(entry.getKey()).append(", ").append(entry.getValue()).append("\n");
