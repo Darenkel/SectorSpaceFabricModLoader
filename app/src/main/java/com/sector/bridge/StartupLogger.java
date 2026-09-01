@@ -15,6 +15,8 @@ public final class StartupLogger {
 
     static final String LOG_FILE_NAME = "SSFML_startup_log.txt";
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    
+    private static volatile TeePrintStream activeTee;
 
     private StartupLogger() {
     }
@@ -45,16 +47,31 @@ public final class StartupLogger {
             PrintStream realOut = System.out;
             PrintStream realErr = System.err;
 
-            TeePrintStream teeOut = new TeePrintStream(realOut, fos, false);
-            TeePrintStream teeErr = new TeePrintStream(realErr, fos, true);
+            TeePrintStream teeOut = new TeePrintStream(realOut, fos, "INFO");
+            TeePrintStream teeErr = new TeePrintStream(realErr, fos, "ERROR");
 
             System.setOut(teeOut);
             System.setErr(teeErr);
+            activeTee = teeOut;
 
             teeOut.println("SSFML: Startup log created at: " + logFile.getAbsolutePath() + (append ? " (appending)" : ""));
         } catch (IOException e) {
             System.err.println("SSFML: Could not open " + LOG_FILE_NAME + ", continuing without file logging: " + e.getMessage());
         }
+    }
+
+    /**
+     * Writes a line to the console and log file tagged with an explicit level, rather than the level being inferred
+     * from whether this is System.out or System.err. Falls back to a plain System.out.println if the tee was never installed
+     * (e.g. install() failed to open the file).
+     */
+    public static void log(String level, String line) {
+        TeePrintStream tee = activeTee;
+        if (tee == null) {
+            System.out.println(line);
+            return;
+        }
+        tee.printWithLevel(level, line);
     }
 
     /**
@@ -65,18 +82,18 @@ public final class StartupLogger {
      */
     private static final class TeePrintStream extends PrintStream {
         private final FileOutputStream fileOut;
-        private final boolean isErrorStream;
+        private final String defaultLevel;
 
-        TeePrintStream(PrintStream real, FileOutputStream fileOut, boolean isErrorStream) {
+        TeePrintStream(PrintStream real, FileOutputStream fileOut, String defaultLevel) {
             super(real, true, StandardCharsets.UTF_8);
             this.fileOut = fileOut;
-            this.isErrorStream = isErrorStream;
+            this.defaultLevel = defaultLevel;
         }
 
         @Override
         public void println(String line) {
             super.println(line);
-            writeToFile(line);
+            writeToFile(defaultLevel, line);
         }
 
         @Override
@@ -84,9 +101,13 @@ public final class StartupLogger {
             println(String.valueOf(obj));
         }
 
-        private void writeToFile(String line) {
-            String prefix = isErrorStream ? "[ERROR]" : "[INFO]";
-            String timestamped = "[" + LocalDateTime.now().format(TIMESTAMP) + "]" + prefix + " " + line + System.lineSeparator();
+        void printWithLevel(String level, String line) {
+            super.println(line);
+            writeToFile(level, line);
+        }
+
+        private void writeToFile(String level, String line) {
+            String timestamped = "[" + LocalDateTime.now().format(TIMESTAMP) + "][" + level + "] " + line + System.lineSeparator();
             try {
                 synchronized (fileOut) {
                     fileOut.write(timestamped.getBytes(StandardCharsets.UTF_8));

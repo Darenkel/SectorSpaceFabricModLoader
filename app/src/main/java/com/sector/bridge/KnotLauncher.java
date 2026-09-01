@@ -17,6 +17,8 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -106,6 +108,7 @@ public class KnotLauncher {
 
             ProcessBuilder pb = new ProcessBuilder(pbCommand);
             pb.directory(gameFolder);
+
             pb.redirectErrorStream(true);
 
             System.out.println("SSFML: Launching Fabric with enabled mods in: " + modsFolder.getAbsolutePath());
@@ -135,7 +138,7 @@ public class KnotLauncher {
                     new InputStreamReader(gameProcess.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    System.out.println("Game: " + line);
+                    StartupLogger.log(classifyGameLine(line), "Game: " + line);
                 }
             } catch (IOException e) {
                 System.err.println("SSFML: Lost the game process's output stream: " + e.getMessage());
@@ -143,6 +146,45 @@ public class KnotLauncher {
         }, "SSFML-game-output-pump");
         outputPump.setDaemon(true);
         return outputPump;
+    }
+
+    private static final Pattern FABRIC_LEVEL_PATTERN = Pattern.compile("\\[\\d{2}:\\d{2}:\\d{2}\\]\\s*\\[(INFO|WARN|ERROR|DEBUG|TRACE|FATAL)\\]");
+
+    /**
+     * Best-effort classification of a single line forwarded from the game process. Since redirectErrorStream(true) merges stdout/stderr before this ever sees it,
+     * there's no stream-based signal left to judge severity from, only the text itself.
+     * <p>
+     * Two things it recognizes:
+     * - Fabric Loader's own bracketed level tag ("[09:24:44] [WARN] [FabricLoader/Mixin]: Text"),
+     *   which is trusted directly since Fabric already knows the real severity of its own lines.
+     * - The game engine's raw, untagged crash output (stack trace frames, "Caused by:", "* Error:",
+     *   the JVM's own "WARNING:" native-access notices, or the word "Exception" anywhere in the
+     *   line), none of which carries any bracketed level at all on its own.
+     * <p>
+     * This is a heuristic, a line that happens to contain the word "Exception" or "Error" in an otherwise benign context
+     * would still get classified as ERROR. Given the alternative is everything defaulting to INFO, false positives here are the 'safer'' failure mode.
+     */
+    private static String classifyGameLine(String line) {
+        Matcher fabricLevel = FABRIC_LEVEL_PATTERN.matcher(line);
+        if (fabricLevel.find()) {
+            return fabricLevel.group(1);
+        }
+
+        String trimmed = line.trim();
+
+        if (trimmed.startsWith("* Error:")
+                || trimmed.startsWith("Caused by:")
+                || trimmed.startsWith("at ")
+                || trimmed.contains("Exception")
+                || trimmed.contains("Error")) {
+            return "ERROR";
+        }
+
+        if (trimmed.startsWith("WARNING:")) {
+            return "WARN";
+        }
+
+        return "INFO";
     }
 
     /**
