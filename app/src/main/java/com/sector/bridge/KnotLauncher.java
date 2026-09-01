@@ -79,34 +79,38 @@ public class KnotLauncher {
             // Syncs mod_list.cfg against mods/ and renames each jar in place to match its true/false state (.jar <-> .jar.disabled).
             mLoader.applyModState(gameFolder);
 
-            List<String> cpParts = new ArrayList<>();
-            cpParts.add(new File(bridgeJarPath).getAbsolutePath());
-            cpParts.add(new File(gameJarPath).getAbsolutePath());
+            List<String> classpathParts = new ArrayList<>();
+            classpathParts.add(new File(bridgeJarPath).getAbsolutePath());
+            classpathParts.add(new File(gameJarPath).getAbsolutePath());
 
             File libsFolder = new File(gameFolder, "libs");
             if (libsFolder.exists()) {
                 File[] libJars = libsFolder.listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".jar"));
                 if (libJars != null) {
                     for (File jar : libJars) {
-                        if (!cpParts.contains(jar.getAbsolutePath())) {
-                            cpParts.add(jar.getAbsolutePath());
+                        if (!classpathParts.contains(jar.getAbsolutePath())) {
+                            classpathParts.add(jar.getAbsolutePath());
                         }
                     }
                 }
             }
 
-            String finalCp = String.join(File.pathSeparator, cpParts);
+            String finalClasspath = String.join(File.pathSeparator, classpathParts);
 
             List<String> pbCommand = new ArrayList<>();
             pbCommand.add(javaBin);
             pbCommand.add("-Djava.library.path=" + new File(gameFolder, "natives").getAbsolutePath());
             pbCommand.add("-Dfabric.gameJarPath=" + gameJarPath);
             pbCommand.add("-Dfabric.modsFolder=" + modsFolder.getAbsolutePath());
-            // Just in case
+            // The bundled lwjgl.jar is unmaintained LWJGL 2.x. It calls java.lang.System::load without native access enabled,
+            // and sun.misc.Unsafe::objectFieldOffset, which the JDK now warns about (JEP 472 / JEP 498) on the way to actually
+            // blocking both in a future release - JDK 26 is the confirmed point where the Unsafe check flips from warn to deny by default.
+            // Since this jar will never be updated upstream, these flags are what keep it running past that point rather than throwing,
+            // for as long as the JDK continues to honor them.
             pbCommand.add("--enable-native-access=ALL-UNNAMED");
             pbCommand.add("--sun-misc-unsafe-memory-access=allow");
-            pbCommand.add("-cp");
-            pbCommand.add(finalCp);
+            pbCommand.add("-classpath");
+            pbCommand.add(finalClasspath);
             pbCommand.add("net.fabricmc.loader.impl.launch.knot.KnotClient");
 
             ProcessBuilder pb = new ProcessBuilder(pbCommand);
@@ -151,7 +155,7 @@ public class KnotLauncher {
         return outputPump;
     }
 
-    private static final Pattern FABRIC_LEVEL_PATTERN = Pattern.compile("\\[\\d{2}:\\d{2}:\\d{2}\\]\\s*\\[(INFO|WARN|ERROR|DEBUG|TRACE|FATAL)\\]");
+    private static final Pattern FABRIC_LEVEL_PATTERN = Pattern.compile("\\[\\d{2}:\\d{2}:\\d{2}]\\s*\\[(INFO|WARN|ERROR|DEBUG|TRACE|FATAL)]");
 
     /**
      * Best-effort classification of a single line forwarded from the game process. Since redirectErrorStream(true) merges stdout/stderr before this ever sees it,
