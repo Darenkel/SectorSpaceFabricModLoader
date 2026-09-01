@@ -24,6 +24,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import javax.swing.JButton;
 import javax.swing.JDialog;
+import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -47,13 +48,13 @@ public class ModLoader {
     private static final String CONFIG_HEADER = "# Auto-generated mod list, start game to update.\n# Otherwise, add in per-line format: ExJar.jar, true/false.\n";
     private static final String DISABLED_SUFFIX = ".disabled";
 
-    private static final Pattern DEPENDS_BLOCK_PATTERN = Pattern.compile("\"depends\"\\s*:\\s*\\{([^}]*)}", Pattern.DOTALL);
-    private static final Pattern DEPENDS_ENTRY_PATTERN = Pattern.compile("\"([^\"]+)\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern BLOCK_ENTRY_PATTERN = Pattern.compile("\"([^\"]+)\"\\s*:\\s*\"([^\"]+)\"");
     private static final Pattern ID_PATTERN = Pattern.compile("\"id\"\\s*:\\s*\"([^\"]+)\"");
     private static final Pattern VERSION_PATTERN = Pattern.compile("\"version\"\\s*:\\s*\"([^\"]+)\"");
 
     /**
-     * User exits the window., while not a crash this should log it just in case.
+     * Thrown when the user chooses "Exit" (or closes the window) on the dependency-issue dialog.
+     * Not a failure/crash.
      */
     public static final class LaunchAbortedException extends Exception {
         LaunchAbortedException(String message) {
@@ -63,6 +64,7 @@ public class ModLoader {
 
     /**
      * Result of a "Continue to Game" vs "Continue to Game and Disable Problem Mods" choice on the dependency-issue dialog.
+     * "Exit" doesn't get a value here as it throws LaunchAbortedException instead, since there's nothing left for applyModState() to do.
      */
     private enum DependencyDialogChoice {
         CONTINUE,
@@ -70,13 +72,22 @@ public class ModLoader {
     }
 
     /**
-     * Holds what logGameVersionCompatibility() found: every check gets logged as it happens,
-     * but this is what applyModState() actually needs afterward to decide whether to show the dependency dialog
-     * and, if so, which mods it would offer to disable.
+     * A single flagged dependency or conflict, in the form the fabric_loader_dependencies.json override file actually needs:
+     * the mod's own id (not its jar filename), the id it couldn't satisfy, and which fabric.mod.json category ("depends" or "breaks") the entry came from.
+     * The override file needs a different "-depends"/"-breaks" key depending on which one it was.
+     */
+        private record ProblemDependency(String modId, String depId, String category) {
+    }
+
+    /**
+     * Holds what logGameVersionCompatibility() found: every check still gets logged as it happens,
+     * but this is what applyModState() actually needs afterward to decide whether to show the dependency dialog and,
+     * if so, which mods it would offer to disable, and what it would offer to write into fabric_loader_dependencies.json instead.
      */
     private static final class DependencyCheckResult {
         final List<String> problemDescriptions = new ArrayList<>();
         final Set<String> problemMods = new LinkedHashSet<>();
+        final List<ProblemDependency> problemDependencies = new ArrayList<>();
     }
 
     /**
@@ -105,9 +116,8 @@ public class ModLoader {
 
             DependencyCheckResult depResult = logGameVersionCompatibility(currentFiles, rebuilt);
 
-            // If any enabled mod has a dependency issue that would likely crash Fabric, ask the user how to proceed instead of letting it crash first.
-            // writeConfig() is called after this, not before, so a "disable" choice here actually persists to mod_list.cfg
-            // instead of only applying for this one launch.
+            // If any enabled mod has a dependency issue that would likely crash Fabric, ask the user how to proceed instead of letting it try and fail.
+            // writeConfig() is deliberately called after this, not before, so a "disable" choice here persists to mod_list.cfg instead of only applying for this one launch.
             if (!depResult.problemMods.isEmpty()) {
                 DependencyDialogChoice choice = showDependencyDialog(gameDir, depResult.problemDescriptions);
                 if (choice == DependencyDialogChoice.CONTINUE_AND_DISABLE) {
@@ -116,7 +126,8 @@ public class ModLoader {
                         System.out.println("SSFML: Disabling " + canonicalName + " per user choice due to dependency issues.");
                     }
                 } else {
-                    System.out.println("SSFML: Continuing with problem mods still enabled per user choice - launch may crash.");
+                    writeDependencyOverrides(gameDir, depResult.problemDependencies);
+                    System.out.println("SSFML: Continuing with problem mods still enabled per user choice - launch may crash if genuinely incompatible.");
                 }
             }
 
@@ -148,9 +159,11 @@ public class ModLoader {
     }
 
     /**
-     * Information scan for each currently enabled mod, check if it declares any "depends" entries against
-     * sector-space, fabricloader, java, and any other enabled mod's own id/version then log whether its requirement is satisfied or not.
-     * Hands back mods that have a definite, unmet requirement so applyModState() can offer the user a choice via dependency dialog.
+     * Information scan for each currently enabled mod: checks its "depends" entries against sector-space, fabricloader, java,
+     * and any other enabled mod's own id/version, checks its "breaks" entries for actual conflicts, and logs its "suggests" entries informationally.
+     * Every check is logged as it happens. What actually gets returned: only "depends" entries that are definitely unmet, and "breaks" entries that definitely do conflict
+     * As those are what applyModState() can offer the user a choice about via the dependency dialog.
+     * "suggests" never ends up in the returned result, and neither does an ambiguous/unparseable requirement in "depends"/"breaks"
      * This runs before Fabric itself starts, so it cannot actually see Fabric's own dependency thing.
      */
     private DependencyCheckResult logGameVersionCompatibility(Map<String, File> currentFiles, Map<String, Boolean> rebuilt) {
@@ -160,9 +173,10 @@ public class ModLoader {
         String fabricLoaderVersion = net.fabricmc.loader.impl.FabricLoaderImpl.VERSION;
         String javaVersion = System.getProperty("java.version");
 
-        // Build modId -> version for every currently-enabled mod, so mod-to-mod
-        // dependencies can be checked the same way the special-cased ones are.
+        // Build modId -> version for every currently-enabled mod, so mod-to-mod dependencies can be checked the same way the special-cased ones are.
+        // Also track canonicalName -> modId, since the override file needs a mod's own id, not its jar filename.
         Map<String, String> enabledModVersions = new LinkedHashMap<>();
+        Map<String, String> canonicalNameToId = new LinkedHashMap<>();
         for (Map.Entry<String, Boolean> entry : rebuilt.entrySet()) {
             if (!entry.getValue()) {
                 continue;
@@ -174,6 +188,7 @@ public class ModLoader {
             String[] idAndVersion = readModIdAndVersion(modFile);
             if (idAndVersion != null) {
                 enabledModVersions.put(idAndVersion[0], idAndVersion[1]);
+                canonicalNameToId.put(entry.getKey(), idAndVersion[0]);
             }
         }
 
@@ -205,8 +220,12 @@ public class ModLoader {
                 continue;
             }
 
-            Map<String, String> depends = readDependsBlock(modFile);
-            if (depends.isEmpty()) {
+            String json = readFabricModJson(modFile);
+            Map<String, String> depends = readNamedBlock(json, "depends");
+            Map<String, String> breaks = readNamedBlock(json, "breaks");
+            Map<String, String> suggests = readNamedBlock(json, "suggests");
+
+            if (depends.isEmpty() && breaks.isEmpty() && suggests.isEmpty()) {
                 System.out.println("SSFML: " + canonicalName + " declares no dependencies to check.");
                 continue;
             }
@@ -244,6 +263,10 @@ public class ModLoader {
                     System.out.println("SSFML: " + canonicalName + " " + reason);
                     result.problemMods.add(canonicalName);
                     result.problemDescriptions.add(canonicalName + " " + reason);
+                    String modId = canonicalNameToId.get(canonicalName);
+                    if (modId != null) {
+                        result.problemDependencies.add(new ProblemDependency(modId, depId, "depends"));
+                    }
                     continue;
                 }
 
@@ -259,6 +282,71 @@ public class ModLoader {
                     System.out.println("SSFML: " + canonicalName + " " + reason);
                     result.problemMods.add(canonicalName);
                     result.problemDescriptions.add(canonicalName + " " + reason);
+                    String modId = canonicalNameToId.get(canonicalName);
+                    if (modId != null) {
+                        result.problemDependencies.add(new ProblemDependency(modId, depId, "depends"));
+                    }
+                }
+            }
+
+            for (Map.Entry<String, String> br : breaks.entrySet()) {
+                String depId = br.getKey();
+                String conflictRange = br.getValue();
+                String actualVersion = switch (depId) {
+                    case "sector-space" -> currentGameVersion;
+                    case "fabricloader" -> fabricLoaderVersion;
+                    case "java" -> javaVersion;
+                    default -> enabledModVersions.get(depId);
+                };
+
+                if (actualVersion == null) {
+                    System.out.println("SSFML: " + canonicalName + " breaks " + depId + " " + conflictRange
+                            + " - not present, no conflict.");
+                    continue;
+                }
+
+                Boolean conflicts = versionSatisfies(actualVersion, conflictRange);
+                if (conflicts == null) {
+                    System.out.println("SSFML: " + canonicalName + " breaks " + depId + " " + conflictRange
+                            + " - could not evaluate against version " + actualVersion + ".");
+                } else if (conflicts) {
+                    String reason = "breaks " + depId + " " + conflictRange + " but found " + actualVersion
+                            + " - these mods conflict.";
+                    System.out.println("SSFML: " + canonicalName + " " + reason);
+                    result.problemMods.add(canonicalName);
+                    result.problemDescriptions.add(canonicalName + " " + reason);
+                    String modId = canonicalNameToId.get(canonicalName);
+                    if (modId != null) {
+                        result.problemDependencies.add(new ProblemDependency(modId, depId, "breaks"));
+                    }
+                } else {
+                    System.out.println("SSFML: " + canonicalName + " breaks " + depId + " " + conflictRange
+                            + " - present as " + actualVersion + ", outside the conflicting range, no conflict.");
+                }
+            }
+
+            for (Map.Entry<String, String> sug : suggests.entrySet()) {
+                String depId = sug.getKey();
+                String suggestedRange = sug.getValue();
+                String actualVersion = switch (depId) {
+                    case "sector-space" -> currentGameVersion;
+                    case "fabricloader" -> fabricLoaderVersion;
+                    case "java" -> javaVersion;
+                    default -> enabledModVersions.get(depId);
+                };
+
+                if (actualVersion == null) {
+                    System.out.println("SSFML: " + canonicalName + " suggests " + depId + " " + suggestedRange
+                            + " - not currently present.");
+                } else {
+                    Boolean satisfied = versionSatisfies(actualVersion, suggestedRange);
+                    String satisfiedText = Boolean.TRUE.equals(satisfied)
+                            ? "present and satisfies this"
+                            : Boolean.FALSE.equals(satisfied)
+                            ? "present but does not satisfy this (" + actualVersion + ")"
+                            : "present (" + actualVersion + ", could not evaluate range)";
+                    System.out.println("SSFML: " + canonicalName + " suggests " + depId + " " + suggestedRange
+                            + " - " + satisfiedText + ".");
                 }
             }
         }
@@ -267,10 +355,9 @@ public class ModLoader {
     }
 
     /**
-     * Shows a modal dialog listing every unmet dependency found by logGameVersionCompatibility(),
+     * Shows a Forge-style modal dialog listing every unmet dependency/conflict found by logGameVersionCompatibility(),
      * with four choices: continue as-is, continue and disable the problem mods, open the startup log, or exit without launching.
-     * "Open Logs" doesn't close the dialog, of course.
-     * Closing the window via the OS close button is treated the same as "Exit".
+     * "Open Logs" doesn't close the dialog. Closing the window via the OS close button is treated the same as "Exit".
      */
     private DependencyDialogChoice showDependencyDialog(File gameDir, List<String> problemDescriptions) throws LaunchAbortedException {
         StringBuilder text = new StringBuilder();
@@ -288,7 +375,7 @@ public class ModLoader {
         JScrollPane scrollPane = new JScrollPane(textArea);
         scrollPane.setPreferredSize(new Dimension(520, 300));
 
-        javax.swing.JFrame dummy = new javax.swing.JFrame("SSFML - Mod Dependency Issue");
+        JFrame dummy = new JFrame("SSFML");
         dummy.setUndecorated(true);
         dummy.setVisible(true);
         dummy.setLocationRelativeTo(null);
@@ -353,6 +440,71 @@ public class ModLoader {
     }
 
     /**
+     * Writes config/fabric_loader_dependencies.json using Fabric Loader's own documented dependency-override mechanism
+     * (see docs.fabricmc.net/players/troubleshooting/dependency-overrides)
+     * So that Fabric's resolver stops treating each flagged "depends"/"breaks" entry as a hard blocker for that mod.
+     * This does NOT make the requirement actually satisfied, it could obviously still crash when the mod tries to grab something that doesn't exist.
+     * <p>
+     * Only writes the file if it doesn't already exist, so a manually made override file from elsewhere is not overwritten.
+     * If one already exists, this just logs what would need to be added by hand instead.
+     */
+    private void writeDependencyOverrides(File gameDir, List<ProblemDependency> problems) {
+        if (problems.isEmpty()) {
+            return;
+        }
+
+        Map<String, Map<String, Set<String>>> overridesByModAndCategory = new LinkedHashMap<>();
+        for (ProblemDependency problem : problems) {
+            overridesByModAndCategory
+                    .computeIfAbsent(problem.modId, k -> new LinkedHashMap<>())
+                    .computeIfAbsent(problem.category, k -> new LinkedHashSet<>())
+                    .add(problem.depId);
+        }
+
+        StringBuilder json = new StringBuilder();
+        json.append("{\n  \"version\": 1,\n  \"overrides\": {\n");
+        int modIndex = 0;
+        int modCount = overridesByModAndCategory.size();
+        for (Map.Entry<String, Map<String, Set<String>>> modEntry : overridesByModAndCategory.entrySet()) {
+            json.append("    \"").append(modEntry.getKey()).append("\": {\n");
+            int catIndex = 0;
+            int catCount = modEntry.getValue().size();
+            for (Map.Entry<String, Set<String>> catEntry : modEntry.getValue().entrySet()) {
+                json.append("      \"-").append(catEntry.getKey()).append("\": {\n");
+                int depIndex = 0;
+                int depCount = catEntry.getValue().size();
+                for (String depId : catEntry.getValue()) {
+                    json.append("        \"").append(depId).append("\": \"IGNORED\"");
+                    json.append(++depIndex < depCount ? ",\n" : "\n");
+                }
+                json.append("      }");
+                json.append(++catIndex < catCount ? ",\n" : "\n");
+            }
+            json.append("    }");
+            json.append(++modIndex < modCount ? ",\n" : "\n");
+        }
+        json.append("  }\n}\n");
+
+        File configDir = new File(gameDir, "config");
+        File overrideFile = new File(configDir, "fabric_loader_dependencies.json");
+
+        if (overrideFile.exists()) {
+            System.err.println("SSFML: " + overrideFile.getAbsolutePath()
+                    + " already exists - not overwriting it. To skip Fabric's check for the flagged dependencies, merge this in by hand:\n" + json);
+            return;
+        }
+
+        try {
+            Files.createDirectories(configDir.toPath());
+            Files.writeString(overrideFile.toPath(), json.toString(), StandardCharsets.UTF_8);
+            System.out.println("SSFML: Wrote " + overrideFile.getAbsolutePath()
+                    + " to skip Fabric's dependency check for " + problems.size() + " flagged requirement(s).");
+        } catch (IOException e) {
+            System.err.println("SSFML: Failed to write fabric_loader_dependencies.json: " + e.getMessage());
+        }
+    }
+
+    /**
      * Reads a mod jar's own "id" and "version" out of its fabric.mod.json, if present.
      * Returns null if either field is missing or the jar has no fabric.mod.json.
      */
@@ -372,22 +524,22 @@ public class ModLoader {
     }
 
     /**
-     * Extracts every key/value pair inside a mod jar's "depends" block. Regex-scoped to just
-     * the "depends" block's braces first, so entries under "recommends"/"conflicts"/etc. aren't picked up by mistake.
+     * Extracts every key/value pair inside a named block ("depends", "breaks", or "suggests")of a mod's fabric.mod.json text.
+     * Regex-scoped to just that block's braces first, so entries under a different category aren't picked up by mistake.
      */
-    private static Map<String, String> readDependsBlock(File modFile) {
+    private static Map<String, String> readNamedBlock(String json, String blockName) {
         Map<String, String> result = new LinkedHashMap<>();
-        String json = readFabricModJson(modFile);
         if (json == null) {
             return result;
         }
 
-        Matcher blockMatcher = DEPENDS_BLOCK_PATTERN.matcher(json);
+        Pattern blockPattern = Pattern.compile("\"" + blockName + "\"\\s*:\\s*\\{([^}]*)}", Pattern.DOTALL);
+        Matcher blockMatcher = blockPattern.matcher(json);
         if (!blockMatcher.find()) {
             return result;
         }
 
-        Matcher entryMatcher = DEPENDS_ENTRY_PATTERN.matcher(blockMatcher.group(1));
+        Matcher entryMatcher = BLOCK_ENTRY_PATTERN.matcher(blockMatcher.group(1));
         while (entryMatcher.find()) {
             result.put(entryMatcher.group(1), entryMatcher.group(2));
         }
