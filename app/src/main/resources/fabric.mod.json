@@ -12,9 +12,6 @@
       "com.sector.bridge.SectorSpaceProvider"
     ]
   },
-  "mixins": [
-    "sectorspacebridge.mixins.json"
-  ],
   "depends": {
     "java": ">=25"
   },

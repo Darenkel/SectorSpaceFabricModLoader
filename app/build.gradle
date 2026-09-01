@@ -12,14 +12,18 @@ plugins {
     //id 'net.fabricmc.fabric-loom' version '1.16.1'
 }
 
+base {
+    archivesName = "new_SSFML_Build"
+}
+
 repositories {
 
     flatDir {
         dirs 'libs'
     }
     // 1. Fabric MUST be first for the loader
-    maven { 
-        url = uri("https://maven.fabricmc.net") 
+    maven {
+        url = uri("https://maven.fabricmc.net")
     }
     maven {
         url = uri("https://fabricmc.net")
@@ -27,8 +31,8 @@ repositories {
     // 2. MavenCentral for standard libraries
     mavenCentral()
     // 3. Sponge for Mixins later
-    maven { 
-        url = uri("https://repo.spongepowered.org/maven/") 
+    maven {
+        url = uri("https://repo.spongepowered.org/maven/")
     }
 }
 
@@ -39,39 +43,39 @@ loom {
 def getGamePath() {
     Properties props = new Properties()
     File configFile = file('locVerifier_settings.properties')
-    
+
     if (configFile.exists()) {
         configFile.withInputStream { props.load(it) }
         // Use the elvis operator (?:) to provide a fallback if the key is missing
         String path = props.getProperty('game_path') ?: "${projectDir}/libs/SectorSpace.jar"
-        return file(path).absolutePath 
+        return file(path).absolutePath
     } else {
-        Path gameDir = Paths.get("").toAbsolutePath(); 
+        Path gameDir = Paths.get("").toAbsolutePath();
     }
-    
+
     return file("${projectDir}/libs/Sector Space.jar")
 }
 
 jar {
     manifest {
         attributes(
-            // Point this to your LocVerifierApp or a new Launcher class
-            'Main-Class': 'com.sector.bridge.KnotLauncher' 
+                // Point this to your LocVerifierApp or a new Launcher class
+                'Main-Class': 'com.sector.bridge.KnotLauncher'
         )
     }
     // Include your code and UI dependencies
     from sourceSets.main.output
-    
+
     // EXCLUDE Fabric/Game JARs to prevent the Cast Error
     from {
         configurations.runtimeClasspath
-            .filter { file -> 
-                !file.name.equals("Sector Space.jar") && 
-                !file.name.contains("fabric-loader") &&
-                !file.name.contains("asm") &&             // Exclude ASM
-                !file.name.contains("sponge-mixin")        // Exclude Mixin
-            }
-            .collect { it.isDirectory() ? it : zipTree(it) }
+                .filter { file ->
+                    !file.name.equals("Sector Space.jar") &&
+                            !file.name.contains("fabric-loader") &&
+                            !file.name.contains("asm") &&             // Exclude ASM
+                            !file.name.contains("sponge-mixin")        // Exclude Mixin
+                }
+                .collect { it.isDirectory() ? it : zipTree(it) }
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
@@ -82,13 +86,13 @@ dependencies {
     // This 'file(...)' wrapper converts the relative path to an absolute one
     //implementation fileTree(dir: file("${project.rootDir}/libs"), include: ['*.jar'])
     compileOnly files("libs/Sector Space.jar")
- 
+
     implementation fileTree(dir: 'libs', include: ['*.jar'], exclude: ['Sector Space.jar'])
 
     //compileOnly files('libs/sponge-mixin-0.15.3-mixin.8.7.0.jar')
     // Use JUnit Jupiter for testing.
     testImplementation libs.junit.jupiter
- 
+
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     //implementation "org.lwjgl.lwjgl:lwjgl:2.9.3"
 
@@ -100,8 +104,8 @@ dependencies {
 
     // These are required to satisfy Loom's internal checks
     // They won't actually be used if you've disabled the remap tasks
-   // add("minecraft", "com.mojang:minecraft:1.21")
-   // add("mappings", "net.fabricmc:yarn:1.21+build.1:v2")
+    // add("minecraft", "com.mojang:minecraft:1.21")
+    // add("mappings", "net.fabricmc:yarn:1.21+build.1:v2")
 
     // These are the missing pieces for Knot/ASM to work
     /* implementation name: 'asm-9.9'
@@ -110,7 +114,7 @@ dependencies {
     implementation name: 'asm-tree-9.9'
     implementation name: 'asm-util-9.9'
     */
-        // MIXIN (The missing piece causing the new crash)
+    // MIXIN (The missing piece causing the new crash)
     /*implementation ("net.fabricmc:sponge-mixin:0.15.3+mixin.0.8.7") {
         exclude group: 'org.ow2.asm' // Prevents version conflicts with the ASM above
     }*/
@@ -125,7 +129,7 @@ dependencies {
     // Core Fabric Loader
     // implementation ("net.fabricmc:fabric-loader:0.18.4")
     // implementation files('app/libs/fabric-loader-0.19.2.jar')
-    
+
     // Sector Space Game JAR as a local dependency
     // compileOnly (files("libs/Sector Space.jar"))
 
