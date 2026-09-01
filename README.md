@@ -28,6 +28,18 @@ gradlew.bat jar  # Windows
 
 The built jar is written to `app/build/libs/`.
 
+### Testing
+
+```bash
+./gradlew test    # Linux/macOS
+gradlew.bat test  # Windows
+```
+
+Covers the version-comparison logic used by the mod dependency checker (`VersionComparisonTest`) and `ModLoader`'s file-based operations.
+Everything runs against a temp directory built per test. 
+Test output goes to `app/build/test-results/` and `app/build/reports/tests/`. 
+These are covered by the existing `**/build/` rule in `.gitignore`.
+
 ## Installing
 
 1. Build or download a release build if one is available.
