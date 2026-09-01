@@ -76,28 +76,56 @@ Example `fabric.mod.json`:
   "schemaVersion": 1,
   "id": "offlcersam_modtest",
   "version": "1.0.0",
-  "name": "WeaponTest",
+  "name": "ModTest",
   "description": "Sector Space test mod.",
   "environment": "*",
 
   "mixins": [
-    "modtest.mixins.json"
+     "modtest.mixins.json"
   ],
 
   "depends": {
-    "fabricloader": ">=0.18.4",
-    "java": ">=25",
-    "sector-space": ">=0.5.9.6",
-    "offlcersam_modexamplelib": ">=1.0.0"
+     "fabricloader": ">=0.18.4", 
+     "java": ">=25", 
+     "sector-space": ">=0.5.9.6", 
+     "offlcersam_modexamplelib": ">=1.0.0"
   }
 }
 ```
-
 Results are printed to the console and `SSFML_startup_log.txt` on every launch, including a log message if a dependency is found but currently disabled versus not being installed at all.
+
+Example `modtest.mixin.json`:
+```json
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "modtest.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+     "ExampleMixin",
+     "OtherExampleMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
+```
+Sector Space isn't obfuscated, so mixins should stay unmapped.
+
+`"package"` is the folder your mixin classes live in (`modtest/mixin/ExampleMixin.java`).
+
+Each mixin class needs `remap = false` set on its `@Mixin` annotation, since there's no official mappings to remap against:
+```java
+@Mixin(value = SomeGameClass.class, remap = false)
+public class ExampleMixin {
+    // @Inject / @Redirect / etc.
+}
+```
 
 ## Logs
 
 If something goes wrong, check `SSFML_startup_log.txt` in your game folder, it mirrors everything printed to the console to a plain text file.
+Logging also currently includes all application logging as well (mods, game, etc), just to unify it into one place.
 
 ## Project structure
 
