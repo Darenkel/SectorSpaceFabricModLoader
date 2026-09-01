@@ -36,7 +36,6 @@ dependencies {
     // Local libraries used by the bridge.
     //
     // These remain available during compilation.
-    // The jar task below prevents Fabric Loader, ASM, Sponge Mixin, and the game JAR from being bundled into the final SSFML JAR.
     implementation fileTree(
             dir: 'libs',
             include: ['*.jar'],
@@ -49,13 +48,13 @@ dependencies {
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
+// This alone is sufficient to control both which JDK compiles this project and what bytecode version it targets.
+// JDK 25 toolchain's javac defaults to targeting Java 25 bytecode with no separate sourceCompatibility/targetCompatibility
+// or options.release override needed alongside it.
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(25)
     }
-
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
 }
 
 tasks.named('test') {
@@ -63,9 +62,11 @@ tasks.named('test') {
     useJUnitPlatform()
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.release = 25
-}
+// Deliberately bundled: Fabric's tiny-mappings-parser, needed to read mappings.tiny (an intentional resource, see app/src/main/resources/mappings.tiny)
+// even though this bridge never remaps anything itself (mixins are all remap=false).
+// Everything else that would otherwise be pulled in from libs/ - fabric-loader, asm, sponge-mixin, the game jar -
+// stays out of the built jar entirely and is expected to already exist on the end user's machine at runtime instead.
+def mappingsParserJar = fileTree(dir: 'libs', include: ['tiny-mappings-parser-0.3.0-build.17.jar'])
 
 jar {
     manifest {
@@ -75,18 +76,8 @@ jar {
         )
     }
 
-    // Include runtime dependencies while excluding Fabric/Game JARs to prevent the Cast Error.
     from {
-        configurations.runtimeClasspath
-                .filter { file ->
-                    !file.name.equalsIgnoreCase("Sector Space.jar") &&
-                            !file.name.contains("fabric-loader") &&
-                            !file.name.contains("asm") &&
-                            !file.name.contains("sponge-mixin")
-                }
-                .collect { file ->
-                    file.isDirectory() ? file : zipTree(file)
-                }
+        mappingsParserJar.collect { file -> zipTree(file) }
     }
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE

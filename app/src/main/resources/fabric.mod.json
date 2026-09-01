@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "sectorspacebridge",
-  "version": "1.0.0",
+  "version": "1.2.6",
   "name": "Space Sector Bridge",
   "description": "Modding a non-Minecraft Java App",
   "license": "MIT",
