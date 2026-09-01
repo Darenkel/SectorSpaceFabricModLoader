@@ -76,7 +76,7 @@ public class ModLoader {
      * the mod's own id (not its jar filename), the id it couldn't satisfy, and which fabric.mod.json category ("depends" or "breaks") the entry came from.
      * The override file needs a different "-depends"/"-breaks" key depending on which one it was.
      */
-        private record ProblemDependency(String modId, String depId, String category) {
+    private record ProblemDependency(String modId, String depId, String category) {
     }
 
     /**
@@ -116,6 +116,8 @@ public class ModLoader {
 
             DependencyCheckResult depResult = logGameVersionCompatibility(currentFiles, rebuilt);
 
+            List<ProblemDependency> overridesToWrite = new ArrayList<>();
+
             // If any enabled mod has a dependency issue that would likely crash Fabric, ask the user how to proceed instead of letting it try and fail.
             // writeConfig() is deliberately called after this, not before, so a "disable" choice here persists to mod_list.cfg instead of only applying for this one launch.
             if (!depResult.problemMods.isEmpty()) {
@@ -126,10 +128,12 @@ public class ModLoader {
                         System.out.println("SSFML: Disabling " + canonicalName + " per user choice due to dependency issues.");
                     }
                 } else {
-                    writeDependencyOverrides(gameDir, depResult.problemDependencies);
+                    overridesToWrite = depResult.problemDependencies;
                     System.out.println("SSFML: Continuing with problem mods still enabled per user choice - launch may crash if genuinely incompatible.");
                 }
             }
+
+            writeDependencyOverrides(gameDir, overridesToWrite);
 
             writeConfig(configPath, rebuilt);
 
@@ -445,11 +449,18 @@ public class ModLoader {
      * So that Fabric's resolver stops treating each flagged "depends"/"breaks" entry as a hard blocker for that mod.
      * This does NOT make the requirement actually satisfied, it could obviously still crash when the mod tries to grab something that doesn't exist.
      * <p>
-     * Only writes the file if it doesn't already exist, so a manually made override file from elsewhere is not overwritten.
-     * If one already exists, this just logs what would need to be added by hand instead.
+     * Fully rewritten every launch, unconditionally.
      */
     private void writeDependencyOverrides(File gameDir, List<ProblemDependency> problems) {
+        File configDir = new File(gameDir, "config");
+        File overrideFile = new File(configDir, "fabric_loader_dependencies.json");
+
         if (problems.isEmpty()) {
+            try {
+                Files.deleteIfExists(overrideFile.toPath());
+            } catch (IOException e) {
+                System.err.println("SSFML: Could not clear " + overrideFile.getAbsolutePath() + ": " + e.getMessage());
+            }
             return;
         }
 
@@ -485,20 +496,11 @@ public class ModLoader {
         }
         json.append("  }\n}\n");
 
-        File configDir = new File(gameDir, "config");
-        File overrideFile = new File(configDir, "fabric_loader_dependencies.json");
-
-        if (overrideFile.exists()) {
-            System.err.println("SSFML: " + overrideFile.getAbsolutePath()
-                    + " already exists - not overwriting it. To skip Fabric's check for the flagged dependencies, merge this in by hand:\n" + json);
-            return;
-        }
-
         try {
             Files.createDirectories(configDir.toPath());
             Files.writeString(overrideFile.toPath(), json.toString(), StandardCharsets.UTF_8);
             System.out.println("SSFML: Wrote " + overrideFile.getAbsolutePath()
-                    + " to skip Fabric's dependency check for " + problems.size() + " flagged requirement(s).");
+                    + " to skip Fabric's dependency check for " + problems.size() + " flagged requirement(s) this launch.");
         } catch (IOException e) {
             System.err.println("SSFML: Failed to write fabric_loader_dependencies.json: " + e.getMessage());
         }

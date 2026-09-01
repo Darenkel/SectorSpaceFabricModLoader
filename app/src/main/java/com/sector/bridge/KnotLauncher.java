@@ -1,15 +1,18 @@
 package com.sector.bridge;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
@@ -103,12 +106,20 @@ public class KnotLauncher {
 
             ProcessBuilder pb = new ProcessBuilder(pbCommand);
             pb.directory(gameFolder);
-            pb.inheritIO();
+            pb.redirectErrorStream(true);
 
             System.out.println("SSFML: Launching Fabric with enabled mods in: " + modsFolder.getAbsolutePath());
             Process gameProcess = pb.start();
             System.out.println("SSFML: Game process started (PID " + gameProcess.pid() + ").");
-            System.exit(0);
+
+            Thread outputPump = getThread(gameProcess);
+            outputPump.start();
+
+            // The parent process now has to stay alive for the pump thread above to keep reading -
+            // once this process exits, so does its ability to see anything more the child prints.
+            int exitCode = gameProcess.waitFor();
+            System.out.println("SSFML: Game process exited with code " + exitCode + ".");
+            System.exit(exitCode);
 
         } catch (ModLoader.LaunchAbortedException e) {
             System.out.println("SSFML: " + e.getMessage() + " Not launching the game.");
@@ -116,6 +127,22 @@ public class KnotLauncher {
             System.err.println("SSFML: Failed to launch game process: " + e);
             e.printStackTrace();
         }
+    }
+
+    private static Thread getThread(Process gameProcess) {
+        Thread outputPump = new Thread(() -> {
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(gameProcess.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    System.out.println("Game: " + line);
+                }
+            } catch (IOException e) {
+                System.err.println("SSFML: Lost the game process's output stream: " + e.getMessage());
+            }
+        }, "SSFML-game-output-pump");
+        outputPump.setDaemon(true);
+        return outputPump;
     }
 
     /**
