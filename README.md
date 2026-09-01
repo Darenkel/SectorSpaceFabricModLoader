@@ -143,5 +143,7 @@ app/
 
 ## Contributing
 
-This is a personal for fun project and fork of the original SSFML code to clean things up, this code might not have to change and will probably be kept minimal to ensure future compatability.
+This is a personal for fun project and fork of the original SSFML code to clean things up, this code might not have to change and will probably be kept minimal to ensure future compatibility.
 Though additional forks are always fun so feel free to fork, make issues, PRs, etc.
+
+Note: This fork of SSFML will try to be as minimal to interacting with the game as possible, theoretically the only thing that would break this in the future is the `game.Main` being altered or moved.
