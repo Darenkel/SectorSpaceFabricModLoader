@@ -45,7 +45,7 @@ import javax.swing.JTextArea;
 
 public class ModLoader {
 
-    private static final String CONFIG_HEADER = "# Auto-generated mod list, start game to update.\n# Otherwise, add in per-line format: ExJar.jar, true/false.\n";
+    private static final String CONFIG_HEADER = "# Auto-generated mod list, start game to update.\n# Otherwise, add in per-line format: ExJar.jar, true or ExJar.jar, false.\n";
     private static final String DISABLED_SUFFIX = ".disabled";
 
     private static final Pattern BLOCK_ENTRY_PATTERN = Pattern.compile("\"([^\"]+)\"\\s*:\\s*\"([^\"]+)\"");
