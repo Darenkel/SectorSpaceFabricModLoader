@@ -10,15 +10,15 @@ public final class SSFMLLogger {
     }
 
     public static void info(String modId, String message) {
-        StartupLogger.log("INFO", "["+modId+"]" + message);
+        StartupLogger.log("INFO", "[" + modId + "] " + message);
     }
 
     public static void warn(String modId, String message) {
-        StartupLogger.log("WARN", "["+modId+"]" + message);
+        StartupLogger.log("WARN", "[" + modId + "] " + message);
     }
 
     public static void error(String modId, String message) {
-        StartupLogger.log("ERROR", "["+modId+"]" + message);
+        StartupLogger.log("ERROR", "[" + modId + "] " + message);
     }
 
     /**
