@@ -13,14 +13,5 @@ bin/
 .idea/
 *.class
 *.log
-
-# Local test files
-saves/
-resources/
-mods/
-natives/
-other-test-files/
-reference-only/
-
-# Ignore Sector Space, user must put there own here.
 app/libs/Sector Space.jar
+
