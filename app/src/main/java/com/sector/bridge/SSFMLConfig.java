@@ -10,9 +10,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Config API for mods, now that the game's own tooling has no equivalent.
- * A mod declares its config as a list of ConfigEntry (key + default value + optional comment) and calls load() once
- * SSFMLConfig resolves the file location, creates it if missing, and reconciles it against whatever's already on disk if it exists.
+ * Config API for mods, now that the game's own tooling has no equivalent. A mod declares its
+ * config as a list of ConfigEntry (key + default value + optional comment) and calls load() once
+ * - SSFMLConfig resolves the file location, creates it if missing, and reconciles it against
+ * whatever's already on disk if it exists.
  * <p>
  * Config lives at {@code <gameDir>/config/<modId>/<modId>.cfg>}, resolved via
  * FabricLoader.getInstance().getGameDir() - a mod never needs to pass a path itself.
@@ -21,8 +22,8 @@ import java.util.Map;
  * - A schema key missing from the file gets added with its default value.
  * - An active (uncommented) key in the file that's no longer in the schema gets commented out,
  *   once, with its last known value preserved rather than deleted.
- * - A key that's already commented out from a previous reconciliation is left exactly as-is.
- *   It's never re-processed, so it can't get double-commented or silently come back to life.
+ * - A key that's already commented out from a previous reconciliation is left exactly as-is -
+ *   it's never re-processed, so it can't get double-commented or silently come back to life.
  * <p>
  * Typical usage:
  * <pre>
@@ -72,8 +73,7 @@ public final class SSFMLConfig {
 
     /**
      * Same as load(String, List), but takes the config file path directly instead of resolving it via FabricLoader.getInstance().getGameDir().
-     * Split out specifically so the actual reconciliation logic can be unit-tested against a real temp file without needing Fabric runtime present.
-     * load(String, List) above is the one mods should actually call.
+     * For Unit testing stuff.
      */
     static Config load(Path configFile, String modId, List<ConfigEntry> schema) {
         Logger log = new Logger(modId);
@@ -115,8 +115,7 @@ public final class SSFMLConfig {
     }
 
     /**
-     * Parses an existing config file into active entries and untouched retired lines
-     * (anything already commented out, or any other non-key=value line - free-text comments, blank lines - preserved verbatim rather than discarded).
+     * Parses an existing config file into active (uncommented key=value) entries and retired lines.
      */
     private static void readExisting(Path configFile, Map<String, String> activeValues, List<String> retiredLines) throws IOException {
         for (String rawLine : Files.readAllLines(configFile, StandardCharsets.UTF_8)) {
@@ -127,7 +126,9 @@ public final class SSFMLConfig {
             }
 
             if (line.startsWith("#")) {
-                retiredLines.add(rawLine);
+                if (isRetiredLine(line)) {
+                    retiredLines.add(rawLine);
+                }
                 continue;
             }
 
@@ -143,6 +144,14 @@ public final class SSFMLConfig {
                 activeValues.put(key, value);
             }
         }
+    }
+
+    /**
+     * A retired line is machine-written with no space after the "#" (e.g. "#oldKey=value...").
+     * Every human-readable comment save() writes always has a space after it ("# text").
+     */
+    private static boolean isRetiredLine(String line) {
+        return line.length() > 1 && line.charAt(1) != ' ';
     }
 
     public static final class Config {
@@ -205,8 +214,9 @@ public final class SSFMLConfig {
         }
 
         /**
-         * Writes the current values back to disk.
-         * Schema entries first (in schema order, with their comments), then any retired/commented lines preserved from the existing file.
+         * Writes the current values back to disk - schema entries first (in schema order, with their comments),
+         * then any retired/commented lines preserved from the existing file.
+         * Failures are logged via SSFMLLogger.
          */
         public void save() {
             StringBuilder sb = new StringBuilder();
