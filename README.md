@@ -127,6 +127,12 @@ public class ExampleMixin {
 If something goes wrong, check `SSFML_startup_log.txt` in your game folder, it mirrors everything printed to the console to a plain text file.
 Logging also currently includes all application logging as well (mods, game, etc), just to unify it into one place.
 
+Mods can also use the following for mod logging, since the in-game modlogger is dead:
+``SSFMLLogger.log``
+``SSFMLLogger.info``
+``SSFMLLogger.warn``
+``SSFMLLogger.error``
+
 ## Project structure
 
 ```
