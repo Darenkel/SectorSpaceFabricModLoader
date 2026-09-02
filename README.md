@@ -36,8 +36,8 @@ gradlew.bat test  # Windows
 ```
 
 Covers the version-comparison logic used by the mod dependency checker (`VersionComparisonTest`) and `ModLoader`'s file-based operations.
-Everything runs against a temp directory built per test. 
-Test output goes to `app/build/test-results/` and `app/build/reports/tests/`. 
+Everything runs against a temp directory built per test.
+Test output goes to `app/build/test-results/` and `app/build/reports/tests/`.
 These are covered by the existing `**/build/` rule in `.gitignore`.
 
 ## Installing
@@ -122,16 +122,48 @@ public class ExampleMixin {
 }
 ```
 
+### Mod config
+
+SSFML ships a small config API instead: `com.sector.bridge.SSFMLConfig`. 
+A mod declares its config as a schema (key, default value, optional comment) and loads it once.
+SSFML resolves the file location, creates it if missing, and reconciles it against whatever's already on disk if it exists.
+
+Config lives at `config/<modId>/<modId>.cfg`, resolved automatically via Fabric's own `FabricLoader.getInstance().getGameDir()`
+
+```java
+private static final List<SSFMLConfig.ConfigEntry> SCHEMA = List.of(
+        new SSFMLConfig.ConfigEntry("maxDroneCount", "5", "Max drones a station can spawn"),
+        new SSFMLConfig.ConfigEntry("dronesEnabled", "true")
+);
+
+private static final SSFMLConfig.Config CONFIG = SSFMLConfig.load("weaponfoundry", SCHEMA);
+
+int maxDrones = CONFIG.getInt("maxDroneCount");
+boolean enabled = CONFIG.getBoolean("dronesEnabled");
+
+CONFIG.set("maxDroneCount", 8);
+CONFIG.save();
+```
+
+On every load, a schema key missing from the file gets added with its default value, and an active key no longer in the schema gets commented out 
+(once, with its last known value preserved) rather than deleted outright. 
+Plain descriptive comments and blank lines in the file aren't preserved verbatim across a save.
+They're regenerated fresh from the current schema every time, so hand-editing structure (as opposed to values) won't stick.
+
 ## Logs
 
 If something goes wrong, check `SSFML_startup_log.txt` in your game folder, it mirrors everything printed to the console to a plain text file.
 Logging also currently includes all application logging as well (mods, game, etc), just to unify it into one place.
 
-Mods can also use the following for mod logging, since the in-game modlogger is dead:
-``SSFMLLogger.log``
-``SSFMLLogger.info``
-``SSFMLLogger.warn``
-``SSFMLLogger.error``
+Mods can also use `com.sector.bridge.SSFMLLogger` for their own logging, since the in-game modlogger is being deprecated and could no longer reliable:
+```java
+SSFMLLogger.log("something happened");
+SSFMLLogger.info("modID", "Loaded 10 weapons");
+SSFMLLogger.warn("modID", "Something looked off, but continuing");
+SSFMLLogger.error("modID", "Something actually broke");
+```
+
+modID must be entered on the mod side, it is not automatically gotten. Otherwise, you can use .log and just manually tag ModName for reference.
 
 ## Project structure
 
@@ -144,6 +176,8 @@ app/
     StartupLogger.java          - Mirrors console output to SSFML_startup_log.txt
     LocVerifierApp.java         - First-run setup UI if not in game directory.
     LocVerifierCFG.java         - Persisted config for game path and version.
+    SSFMLLogger.java            - Mod-facing logging API, routes into SSFML_startup_log.txt
+    SSFMLConfig.java            - Mod-facing config API, config/<modId>/<modId>.cfg
   libs/                         - Fabric Loader, Mixin, ASM, and your own Sector Space.jar.
 ```
 
