@@ -19,106 +19,106 @@ import javax.swing.JLabel;
  * and stores the validated game path and version in LocVerifierCFG.
  */
 public class LocVerifierApp {
-        public static void main(String[] args) {
-            
-            // Creates a hidden frame to act as the owner
-            JFrame dummy = new JFrame("SSFML Bridge Setup");
-            dummy.setUndecorated(true);
-            dummy.setVisible(true);
-            dummy.setLocationRelativeTo(null);
-            
-            // Ensure UI runs on the Event Dispatch Thread (standard for Swing)
-            JDialog frame = new JDialog(dummy, "Bridge Setup: Verify Game JAR", true);
+    public static void main(String[] args) {
 
-            // When the dialog closes, make sure to get rid of the dummy too
-            frame.addWindowListener(new java.awt.event.WindowAdapter() {
+        // Creates a hidden frame to act as the owner
+        JFrame dummy = new JFrame("SSFML Bridge Setup");
+        dummy.setUndecorated(true);
+        dummy.setVisible(true);
+        dummy.setLocationRelativeTo(null);
+
+        // Ensure UI runs on the Event Dispatch Thread (standard for Swing)
+        JDialog frame = new JDialog(dummy, "Bridge Setup: Verify Game JAR", true);
+
+        // When the dialog closes, make sure to get rid of the dummy too
+        frame.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosed(java.awt.event.WindowEvent e) {
                 dummy.dispose();
-                }
-            });
-            
-            frame.setLayout(new java.awt.FlowLayout());
+            }
+        });
 
-            JLabel versionLabel = new JLabel("Game Version: Not Detected");
-            versionLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+        frame.setLayout(new java.awt.FlowLayout());
 
-            frame.setSize(400, 150);
-            frame.setLocationRelativeTo(null);
+        JLabel versionLabel = new JLabel("Game Version: Not Detected");
+        versionLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
 
-            frame.addWindowListener(new java.awt.event.WindowAdapter() {
+        frame.setSize(400, 150);
+        frame.setLocationRelativeTo(null);
+
+        frame.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
                 System.exit(0); // This kills the whole process including Fabric
             }
-            });
+        });
 
-            JButton selectButton = new JButton("Select & Verify Game Folder");
+        JButton selectButton = new JButton("Select & Verify Game Folder");
 
-            selectButton.addActionListener(e -> {
+        selectButton.addActionListener(e -> {
 
-                // 1. Check if we are already verified
-                if (selectButton.getText().equals("Continue to Game")) {
-                    frame.dispose(); // Just close the window and let Fabric continue
-                    return;          // EXIT the method so the code below never runs
-                }
-                JFileChooser chooser = new JFileChooser(); // Create the chooser
-                frame.setAlwaysOnTop(false);
-                chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY); // Select folder, not file
-                int result = chooser.showOpenDialog(frame); // This creates the 'result' variable
+            // 1. Check if we are already verified
+            if (selectButton.getText().equals("Continue to Game")) {
+                frame.dispose(); // Just close the window and let Fabric continue
+                return;          // EXIT the method so the code below never runs
+            }
+            JFileChooser chooser = new JFileChooser(); // Create the chooser
+            frame.setAlwaysOnTop(false);
+            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY); // Select folder, not file
+            int result = chooser.showOpenDialog(frame); // This creates the 'result' variable
 
-                if (result == JFileChooser.APPROVE_OPTION) {
-                    File selectedFolder = chooser.getSelectedFile(); // This is the root folder
+            if (result == JFileChooser.APPROVE_OPTION) {
+                File selectedFolder = chooser.getSelectedFile(); // This is the root folder
 
-                    // Define the two files we need to find inside that folder
-                    File jarFile = new File(selectedFolder, "Sector Space.jar");
-                    File iniFile = new File(selectedFolder, "settings.ini");
+                // Define the two files we need to find inside that folder
+                File jarFile = new File(selectedFolder, "Sector Space.jar");
+                File iniFile = new File(selectedFolder, "settings.ini");
 
-                    // 1. Verify BOTH files exist
-                    if (jarFile.exists() && iniFile.exists()) {
+                // 1. Verify BOTH files exist
+                if (jarFile.exists() && iniFile.exists()) {
 
-                        // 2. Call your version check on the INI file
-                        String version = getGameVersion(iniFile);
+                    // 2. Call your version check on the INI file
+                    String version = getGameVersion(iniFile);
 
-                        if (version != null) {
-                            // 3. Save the data: Use the JAR path and the parsed version
-                            LocVerifierCFG.saveSettings(jarFile.getAbsolutePath(), version);
-                            System.out.println("LocVApp: Verified game at " + selectedFolder.getAbsolutePath()
-                                    + " (version " + version + ").");
+                    if (version != null) {
+                        // 3. Save the data: Use the JAR path and the parsed version
+                        LocVerifierCFG.saveSettings(jarFile.getAbsolutePath(), version);
+                        System.out.println("LocVApp: Verified game at " + selectedFolder.getAbsolutePath()
+                                + " (version " + version + ").");
 
-                            // 4. Update the UI Labels
-                            versionLabel.setText("Client Version: " + version + " (Verified)");
-                            versionLabel.setForeground(new java.awt.Color(0, 150, 0));
+                        // 4. Update the UI Labels
+                        versionLabel.setText("Client Version: " + version + " (Verified)");
+                        versionLabel.setForeground(new java.awt.Color(0, 150, 0));
 
-                            // 5. Change the Button to "Continue"
-                            selectButton.setText("Continue to Game");
-                        } else {
-                            System.err.println("LocVApp: Found settings.ini in " + selectedFolder.getAbsolutePath()
-                                    + " but could not read a client version from it.");
-                            javax.swing.JOptionPane.showMessageDialog(frame,
-                                    "Found settings.ini but couldn't read a client version from it!",
-                                    "Verification Failed", javax.swing.JOptionPane.ERROR_MESSAGE);
-                        }
+                        // 5. Change the Button to "Continue"
+                        selectButton.setText("Continue to Game");
                     } else {
-                        // Error handling for missing files
-                        System.err.println("LocVApp: Missing 'Sector Space.jar' or 'settings.ini' in "
-                                + selectedFolder.getAbsolutePath());
+                        System.err.println("LocVApp: Found settings.ini in " + selectedFolder.getAbsolutePath()
+                                + " but could not read a client version from it.");
                         javax.swing.JOptionPane.showMessageDialog(frame,
-                                "Missing 'Sector Space.jar' or 'settings.ini' in this folder!",
+                                "Found settings.ini but couldn't read a client version from it!",
                                 "Verification Failed", javax.swing.JOptionPane.ERROR_MESSAGE);
                     }
+                } else {
+                    // Error handling for missing files
+                    System.err.println("LocVApp: Missing 'Sector Space.jar' or 'settings.ini' in "
+                            + selectedFolder.getAbsolutePath());
+                    javax.swing.JOptionPane.showMessageDialog(frame,
+                            "Missing 'Sector Space.jar' or 'settings.ini' in this folder!",
+                            "Verification Failed", javax.swing.JOptionPane.ERROR_MESSAGE);
                 }
-            });
-            frame.add(versionLabel);
-            frame.add(selectButton);
-            frame.pack();
-            frame.setLocationRelativeTo(null);
-            frame.setAlwaysOnTop(true); // Forces it above the terminal/IDE
-            frame.toFront();
-            frame.requestFocus();
-            frame.setVisible(true);
-            System.out.println("LocVApp: Setup UI displayed.");
-        };
+            }
+        });
+        frame.add(versionLabel);
+        frame.add(selectButton);
+        frame.pack();
+        frame.setLocationRelativeTo(null);
+        frame.setAlwaysOnTop(true); // Forces it above the terminal/IDE
+        frame.toFront();
+        frame.requestFocus();
+        frame.setVisible(true);
+        System.out.println("LocVApp: Setup UI displayed.");
+    };
 
     /**
      * Parses the client version from settings.ini.
@@ -130,7 +130,7 @@ public class LocVerifierApp {
         try (java.util.Scanner scanner = new java.util.Scanner(iniFile)) {
             while (scanner.hasNextLine()) {
                 String line = scanner.nextLine().trim();
-                
+
                 // This matches the exact line from your previous screenshot
                 if (line.startsWith("client version=")) {
                     // Splits "client version=0.5.9.4" into ["client version", "0.5.9.4"]
@@ -170,5 +170,31 @@ public class LocVerifierApp {
         System.out.println("LocVApp: Auto-detected game at " + folder.getAbsolutePath()
                 + " (version " + version + ").");
         return true;
+    }
+
+    /**
+     * Re-checks the actual "client version" in settings.ini.
+     */
+    public static void refreshCachedVersion(File gameJarFile) {
+        File folder = gameJarFile.getParentFile();
+        File iniFile = new File(folder, "settings.ini");
+
+        if (!iniFile.exists()) {
+            return;
+        }
+
+        String currentVersion = getGameVersion(iniFile);
+        if (currentVersion == null) {
+            return;
+        }
+
+        String cachedVersion = LocVerifierCFG.getProperty("game_version");
+        if (currentVersion.equals(cachedVersion)) {
+            return;
+        }
+
+        LocVerifierCFG.saveSettings(gameJarFile.getAbsolutePath(), currentVersion);
+        System.out.println("LocVApp: Detected game update - cached version was "
+                + cachedVersion + ", settings.ini now reports " + currentVersion + ". Updated cache.");
     }
 }

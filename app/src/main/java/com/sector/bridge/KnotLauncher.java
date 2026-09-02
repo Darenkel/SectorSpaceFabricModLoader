@@ -57,6 +57,9 @@ public class KnotLauncher {
             }
         }
 
+        // Re-check the actual game version on every launch, not just first-time setup.
+        LocVerifierApp.refreshCachedVersion(new File(savedPath));
+
         System.out.println("SSFML: Game found at: " + savedPath);
         ensureFabricLibs(savedPath);
         launch(savedPath, bridgeJarPath);
