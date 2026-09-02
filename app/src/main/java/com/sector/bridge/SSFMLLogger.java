@@ -25,7 +25,7 @@ public final class SSFMLLogger {
     /**
      * Convenience for replacing old ModLogger.log(String)
      */
-    public static void log(String message) {
-        StartupLogger.log("INFO", message);
+    public static void log(String modId, String message) {
+        StartupLogger.log("LOG", "[" + modId + "] " + message);
     }
 }
