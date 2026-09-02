@@ -6,7 +6,8 @@ This is a project under development, it is unofficial, and not entirely affiliat
 
 This work is a collaboration of the efforts of the following minds:
 
-Darenkel
+Darenkel 
+
 Offlcer_Sam
 
 See Official Sector Space discord for communication.
