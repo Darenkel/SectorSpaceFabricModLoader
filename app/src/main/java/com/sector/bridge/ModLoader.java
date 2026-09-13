@@ -109,9 +109,19 @@ public class ModLoader {
             // Canonical name on-disk and whether it's currently enabled or disabled.
             Map<String, File> currentFiles = getStringFileMap(modsDir);
 
+            // Anything in currentFiles but not yet in mod_list.cfg is a first-time add this startup.
+            Set<String> newlyAdded = new LinkedHashSet<>();
+            for (String canonicalName : currentFiles.keySet()) {
+                if (!existing.containsKey(canonicalName)) {
+                    newlyAdded.add(canonicalName);
+                }
+            }
+
+            boolean newModDefaultState = LocVerifierCFG.isNewModsEnabledByDefault();
+
             Map<String, Boolean> rebuilt = new LinkedHashMap<>();
             for (String canonicalName : currentFiles.keySet()) {
-                rebuilt.put(canonicalName, existing.getOrDefault(canonicalName, false));
+                rebuilt.put(canonicalName, existing.getOrDefault(canonicalName, newModDefaultState));
             }
 
             DependencyCheckResult depResult = logGameVersionCompatibility(currentFiles, rebuilt);
@@ -156,6 +166,10 @@ public class ModLoader {
             }
 
             logMountedMods(rebuilt);
+
+            if (LocVerifierCFG.isStartupSummaryWindowEnabled()) {
+                showStartupSummaryWindow(newlyAdded, newModDefaultState, rebuilt, depResult.problemDescriptions);
+            }
 
         } catch (IOException e) {
             System.err.println("SSFML: Failed applying mod state: " + e.getMessage());
@@ -384,7 +398,7 @@ public class ModLoader {
             }
 
             String modId = group.getKey();
-            String keeper = canonicalNames.get(0);
+            String keeper = canonicalNames.getFirst();
             String keeperVersion = versionOf(currentFiles.get(keeper));
 
             for (String candidate : canonicalNames.subList(1, canonicalNames.size())) {
@@ -504,6 +518,111 @@ public class ModLoader {
         }
 
         return choice[0];
+    }
+
+    /**
+     * Shows the SSFML startup summary window, after mod state and any dependency dialog choice above have already been finalized.
+     * Only called when LocVerifierCFG.isStartupSummaryWindowEnabled() is true.
+     * The caller checks that before invoking this, since this method's own job is just building and showing the window, not deciding whether to.
+     * Shows which mods got auto-added to mod_list.cfg this run (and whether they defaulted to enabled/disabled per LocVerifierCFG.isNewModsEnabledByDefault()),
+     * the final enabled/disabled lists, and any dependency issues logGameVersionCompatibility() found.
+     * <p>
+     * Modal, blocks until "Launch Game" is clicked.
+     */
+    private void showStartupSummaryWindow(Set<String> newlyAdded, boolean newModDefaultState,
+                                          Map<String, Boolean> rebuilt, List<String> problemDescriptions) throws LaunchAbortedException {
+        StringBuilder text = new StringBuilder();
+
+        text.append("Mods automatically added to mod_list.cfg this startup (default: ")
+                .append(newModDefaultState ? "enabled" : "disabled").append("):\n");
+        if (newlyAdded.isEmpty()) {
+            text.append("  None\n");
+        } else {
+            List<String> sortedNew = new ArrayList<>(newlyAdded);
+            sortedNew.sort(String.CASE_INSENSITIVE_ORDER);
+            for (String name : sortedNew) {
+                text.append("  - ").append(name).append(" (").append(rebuilt.get(name) ? "enabled" : "disabled").append(")\n");
+            }
+        }
+
+        List<String> enabled = new ArrayList<>();
+        List<String> disabled = new ArrayList<>();
+        for (Map.Entry<String, Boolean> entry : rebuilt.entrySet()) {
+            (entry.getValue() ? enabled : disabled).add(entry.getKey());
+        }
+        enabled.sort(String.CASE_INSENSITIVE_ORDER);
+        disabled.sort(String.CASE_INSENSITIVE_ORDER);
+
+        text.append("\nMods Enabled:\n");
+        if (enabled.isEmpty()) {
+            text.append("  None\n");
+        } else {
+            for (String name : enabled) {
+                text.append("  - ").append(name).append("\n");
+            }
+        }
+
+        text.append("\nMods Disabled:\n");
+        if (disabled.isEmpty()) {
+            text.append("  None\n");
+        } else {
+            for (String name : disabled) {
+                text.append("  - ").append(name).append("\n");
+            }
+        }
+
+        text.append("\nDependency Issues:\n");
+        if (problemDescriptions.isEmpty()) {
+            text.append("  None found.\n");
+        } else {
+            for (String line : problemDescriptions) {
+                text.append("  - ").append(line).append("\n");
+            }
+        }
+
+        JTextArea textArea = new JTextArea(text.toString());
+        textArea.setEditable(false);
+        textArea.setLineWrap(true);
+        textArea.setWrapStyleWord(true);
+        textArea.setCaretPosition(0);
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        scrollPane.setPreferredSize(new Dimension(520, 420));
+
+        JFrame dummy = new JFrame("SSFML");
+        dummy.setUndecorated(true);
+        dummy.setVisible(true);
+        dummy.setLocationRelativeTo(null);
+
+        JDialog dialog = new JDialog(dummy, "SSFML - Startup Summary", true);
+        dialog.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
+
+        final boolean[] launchRequested = { false };
+
+        JButton launchButton = new JButton("Launch Game");
+        JButton exitButton = new JButton("Exit");
+
+        launchButton.addActionListener(e -> {
+            launchRequested[0] = true;
+            dialog.dispose();
+        });
+        exitButton.addActionListener(e -> dialog.dispose());
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 8));
+        buttonPanel.add(launchButton);
+        buttonPanel.add(exitButton);
+
+        dialog.getContentPane().setLayout(new BorderLayout());
+        dialog.getContentPane().add(scrollPane, BorderLayout.CENTER);
+        dialog.getContentPane().add(buttonPanel, BorderLayout.SOUTH);
+        dialog.pack();
+        dialog.setLocationRelativeTo(null);
+        dialog.setVisible(true); // Blocks here until "Launch Game" or "Exit" disposes it.
+
+        dummy.dispose();
+
+        if (!launchRequested[0]) {
+            throw new LaunchAbortedException("User chose to exit from the startup summary window.");
+        }
     }
 
     /**

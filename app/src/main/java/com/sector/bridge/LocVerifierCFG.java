@@ -10,6 +10,8 @@ import java.util.Properties;
 
 public class LocVerifierCFG {
     private static final String CONFIG_FILE = "locVerifier_settings.properties";
+    private static final String KEY_NEW_MODS_ENABLED_BY_DEFAULT = "new_mods_enabled_by_default";
+    private static final String KEY_SHOW_STARTUP_SUMMARY_WINDOW = "show_startup_summary_window";
     private static final Properties props = new Properties();
 
     static {
@@ -20,6 +22,34 @@ public class LocVerifierCFG {
     public static void saveSettings(String gamePath, String gameVersion) {
         props.setProperty("game_path", gamePath);
         props.setProperty("game_version", gameVersion);
+        persistSettings();
+    }
+
+    // Is mod jar seen in mods/ for first time config.
+    public static boolean isNewModsEnabledByDefault() {
+        if (props.isEmpty()) loadSettings();
+
+        if (!props.containsKey(KEY_NEW_MODS_ENABLED_BY_DEFAULT)) {
+            props.setProperty(KEY_NEW_MODS_ENABLED_BY_DEFAULT, "false");
+            persistSettings();
+        }
+
+        return Boolean.parseBoolean(props.getProperty(KEY_NEW_MODS_ENABLED_BY_DEFAULT));
+    }
+
+    // Startup window config
+    public static boolean isStartupSummaryWindowEnabled() {
+        if (props.isEmpty()) loadSettings();
+
+        if (!props.containsKey(KEY_SHOW_STARTUP_SUMMARY_WINDOW)) {
+            props.setProperty(KEY_SHOW_STARTUP_SUMMARY_WINDOW, "true");
+            persistSettings();
+        }
+
+        return Boolean.parseBoolean(props.getProperty(KEY_SHOW_STARTUP_SUMMARY_WINDOW));
+    }
+
+    private static void persistSettings() {
         try (OutputStream out = new FileOutputStream(CONFIG_FILE)) {
             props.store(out, "Fabric Bridge Configuration");
             System.out.println("LocVCFG: Saved configuration to " + CONFIG_FILE + ".");
