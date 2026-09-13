@@ -95,7 +95,7 @@ public class ModLoader {
      * This is called once per launch, before Fabric/Knot starts.
      * Fabric will then scan and loads mods/ once this returns.
      */
-    public void applyModState(File gameDir) throws LaunchAbortedException {
+    public void applyModState(File gameDir, List<String> libEvents) throws LaunchAbortedException {
         Path modsDir = gameDir.toPath().resolve("mods");
         Path configPath = modsDir.resolve("mod_list.cfg");
 
@@ -128,18 +128,25 @@ public class ModLoader {
 
             List<ProblemDependency> overridesToWrite = new ArrayList<>();
 
+            boolean showStartupSummary = LocVerifierCFG.isStartupSummaryWindowEnabled();
+
             // If any enabled mod has a dependency issue that would likely crash Fabric, ask the user how to proceed instead of letting it try and fail.
             // writeConfig() is deliberately called after this, not before, so a "disable" choice here persists to mod_list.cfg instead of only applying for this one launch.
             if (!depResult.problemMods.isEmpty()) {
-                DependencyDialogChoice choice = showDependencyDialog(gameDir, depResult.problemDescriptions);
-                if (choice == DependencyDialogChoice.CONTINUE_AND_DISABLE) {
-                    for (String canonicalName : depResult.problemMods) {
-                        rebuilt.put(canonicalName, false);
-                        System.out.println("SSFML: Disabling " + canonicalName + " per user choice due to dependency issues.");
-                    }
-                } else {
+                if (showStartupSummary) {
                     overridesToWrite = depResult.problemDependencies;
-                    System.out.println("SSFML: Continuing with problem mods still enabled per user choice - launch may crash if genuinely incompatible.");
+                    System.out.println("SSFML: Dependency issues found - see the startup summary window. Continuing with problem mods still enabled; launch may crash if genuinely incompatible.");
+                } else {
+                    DependencyDialogChoice choice = showDependencyDialog(gameDir, depResult.problemDescriptions);
+                    if (choice == DependencyDialogChoice.CONTINUE_AND_DISABLE) {
+                        for (String canonicalName : depResult.problemMods) {
+                            rebuilt.put(canonicalName, false);
+                            System.out.println("SSFML: Disabling " + canonicalName + " per user choice due to dependency issues.");
+                        }
+                    } else {
+                        overridesToWrite = depResult.problemDependencies;
+                        System.out.println("SSFML: Continuing with problem mods still enabled per user choice - launch may crash if genuinely incompatible.");
+                    }
                 }
             }
 
@@ -167,8 +174,8 @@ public class ModLoader {
 
             logMountedMods(rebuilt);
 
-            if (LocVerifierCFG.isStartupSummaryWindowEnabled()) {
-                showStartupSummaryWindow(newlyAdded, newModDefaultState, rebuilt, depResult.problemDescriptions);
+            if (showStartupSummary) {
+                showStartupSummaryWindow(newlyAdded, newModDefaultState, rebuilt, depResult.problemDescriptions, libEvents);
             }
 
         } catch (IOException e) {
@@ -398,7 +405,7 @@ public class ModLoader {
             }
 
             String modId = group.getKey();
-            String keeper = canonicalNames.getFirst();
+            String keeper = canonicalNames.get(0);
             String keeperVersion = versionOf(currentFiles.get(keeper));
 
             for (String candidate : canonicalNames.subList(1, canonicalNames.size())) {
@@ -520,18 +527,28 @@ public class ModLoader {
         return choice[0];
     }
 
+
     /**
      * Shows the SSFML startup summary window, after mod state and any dependency dialog choice above have already been finalized.
      * Only called when LocVerifierCFG.isStartupSummaryWindowEnabled() is true.
      * The caller checks that before invoking this, since this method's own job is just building and showing the window, not deciding whether to.
      * Shows which mods got auto-added to mod_list.cfg this run (and whether they defaulted to enabled/disabled per LocVerifierCFG.isNewModsEnabledByDefault()),
-     * the final enabled/disabled lists, and any dependency issues logGameVersionCompatibility() found.
+     * the final enabled/disabled lists, lib repairs/downloads, and any dependency issues logGameVersionCompatibility() found.
      * <p>
      * Modal, blocks until "Launch Game" is clicked.
      */
     private void showStartupSummaryWindow(Set<String> newlyAdded, boolean newModDefaultState,
-                                          Map<String, Boolean> rebuilt, List<String> problemDescriptions) throws LaunchAbortedException {
+                                          Map<String, Boolean> rebuilt, List<String> problemDescriptions,
+                                          List<String> libEvents) throws LaunchAbortedException {
         StringBuilder text = new StringBuilder();
+
+        if (!libEvents.isEmpty()) {
+            text.append("Libraries downloaded or repaired this startup:\n");
+            for (String event : libEvents) {
+                text.append("  - ").append(event).append("\n");
+            }
+            text.append("\n");
+        }
 
         text.append("Mods automatically added to mod_list.cfg this startup (default: ")
                 .append(newModDefaultState ? "enabled" : "disabled").append("):\n");

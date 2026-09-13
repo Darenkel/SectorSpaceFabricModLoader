@@ -61,8 +61,8 @@ public class KnotLauncher {
         LocVerifierApp.refreshCachedVersion(new File(savedPath));
 
         System.out.println("SSFML: Game found at: " + savedPath);
-        ensureFabricLibs(savedPath);
-        launch(savedPath, bridgeJarPath);
+        List<String> libEvents = ensureFabricLibs(savedPath);
+        launch(savedPath, bridgeJarPath, libEvents);
     }
 
 
@@ -72,7 +72,7 @@ public class KnotLauncher {
      * - extracted runtime libs
      * - mods/ directly, after syncing enable/disable state onto the files there
      */
-    public static void launch(String gameJarPath, String bridgeJarPath) {
+    public static void launch(String gameJarPath, String bridgeJarPath, List<String> libEvents) {
         File gameFolder = new File(gameJarPath).getParentFile();
         File modsFolder = new File(gameFolder, "mods");
 
@@ -81,7 +81,7 @@ public class KnotLauncher {
 
         try {
             // Syncs mod_list.cfg against mods/ and renames each jar in place to match its true/false state (.jar <-> .jar.disabled).
-            mLoader.applyModState(gameFolder);
+            mLoader.applyModState(gameFolder, libEvents);
 
             List<String> classpathParts = new ArrayList<>();
             classpathParts.add(new File(bridgeJarPath).getAbsolutePath());
@@ -207,22 +207,25 @@ public class KnotLauncher {
 
     /**
      * Ensures the local Fabric dependency set exists in the project or local game folder.
+     * Returns a description of every lib this had to obtain or repair this run.
      */
-    private static void ensureFabricLibs(String gameJarPath) {
+    private static List<String> ensureFabricLibs(String gameJarPath) {
         File gameFolder = new File(gameJarPath).getParentFile();
         File gameJar = new File(gameJarPath);
         File libsDir = new File(gameFolder, "libs");
 
+        List<String> libEvents = new ArrayList<>();
+
         if (!libsDir.exists() && !libsDir.mkdirs()) {
             System.err.println("SSFML: Could not create libraries directory: "
                     + libsDir.getAbsolutePath());
-            return;
+            return libEvents;
         }
 
         if (!libsDir.isDirectory()) {
             System.err.println("SSFML: Libraries path is not a directory: "
                     + libsDir.getAbsolutePath());
-            return;
+            return libEvents;
         }
 
         sweepStaleDownloads(libsDir);
@@ -248,7 +251,8 @@ public class KnotLauncher {
             }
 
             // Remove any incomplete or corrupt JAR before attempting to obtain it.
-            if (target.exists()) {
+            boolean wasPresentButInvalid = target.exists();
+            if (wasPresentButInvalid) {
                 System.out.println("SSFML: Invalid or corrupt dependency found: " + libName);
 
                 if (!target.delete()) {
@@ -306,6 +310,7 @@ public class KnotLauncher {
 
             if (obtained) {
                 stripSignatures(target);
+                libEvents.add(libName + (wasPresentButInvalid ? " (repaired - was corrupt)" : " (downloaded - was missing)"));
             } else {
                 List<String> urls = getUrls(libName);
                 failedLibs.add(libName + " (tried: " + String.join(", ", urls) + ")");
@@ -322,6 +327,8 @@ public class KnotLauncher {
         } else {
             System.out.println("SSFML: All required libraries verified.");
         }
+
+        return libEvents;
     }
 
     /**
