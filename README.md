@@ -2,9 +2,13 @@
 
 A [Fabric Loader](https://fabricmc.net/) bridge that lets [Sector Space](https://store.steampowered.com/app/3978250/Sector_Space/) load Fabric-style Mixin mods.
 
-This is a work in progress fork, it is unofficial, not entirely affiliated with the developer of Sector Space.
+This is a project under development, it is unofficial, and not entirely affiliated with the developer of Sector Space.
 
-Thank you, Darenkel for initial setup of the SSFML files.
+This work is a collaboration of the efforts of the following minds:
+
+Darenkel 
+
+Offlcer_Sam
 
 See Official Sector Space discord for communication.
 
@@ -89,19 +93,10 @@ Example `fabric.mod.json`:
      "java": ">=25", 
      "sector-space": ">=0.5.9.6", 
      "offlcersam_modexamplelib": ">=1.0.0"
-  },
-
-  "contact": {
-    "homepage": "",
-    "sources": "",
-    "issues": ""
   }
 }
 ```
 Results are printed to the console and `SSFML_startup_log.txt` on every launch, including a log message if a dependency is found but currently disabled versus not being installed at all.
-
-Do not put SSFML as a depends requirement, it cannot detect itself.
-Contact I think is correct metadata for fabricloader, so is "custom".
 
 Example `modtest.mixin.json`:
 ```json
