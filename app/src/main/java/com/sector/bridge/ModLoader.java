@@ -178,8 +178,39 @@ public class ModLoader {
                 showStartupSummaryWindow(newlyAdded, newModDefaultState, rebuilt, depResult.problemDescriptions, libEvents);
             }
 
+            applyModContent(gameDir, currentFiles, rebuilt);
+
         } catch (IOException e) {
             System.err.println("SSFML: Failed applying mod state: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Lets each enabled mod's optional ssfml_items.json (custom items/market listings) register through
+     * com.sector.bridge.moditems.ModContentManager. Wrapped separately from the rest of applyModState so a
+     * problem here (malformed JSON, id registry I/O failure, etc.) never blocks mods from actually loading.
+     */
+    private void applyModContent(File gameDir, Map<String, File> currentFiles, Map<String, Boolean> rebuilt) {
+        try {
+            Map<String, File> enabledModJarsById = new LinkedHashMap<>();
+            for (Map.Entry<String, Boolean> entry : rebuilt.entrySet()) {
+                if (!entry.getValue()) {
+                    continue;
+                }
+                File modFile = currentFiles.get(entry.getKey());
+                if (modFile == null) {
+                    continue;
+                }
+                String[] idAndVersion = readModIdAndVersion(modFile);
+                if (idAndVersion == null) {
+                    continue;
+                }
+                enabledModJarsById.put(idAndVersion[0], modFile);
+            }
+
+            com.sector.bridge.moditems.ModContentManager.loadAndApply(gameDir, enabledModJarsById, LocVerifierCFG.getNormalizedGameVersion());
+        } catch (RuntimeException e) {
+            System.err.println("SSFML: Failed applying mod item/market content: " + e.getMessage());
         }
     }
 
